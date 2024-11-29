@@ -60,6 +60,7 @@
       - HOLDER=http://holder:3001
     volumes:
       - ./example.py:/usr/src/app/example.py:ro,z
+      - ./helpers.py:/usr/src/app/helpers.py:ro,z
     command: python -m example
     depends_on:
       issuer:
