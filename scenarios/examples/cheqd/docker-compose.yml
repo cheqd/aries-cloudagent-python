@@ -15,7 +15,7 @@
         --wallet-name agency
         --wallet-key insecure
         --auto-provision
-        --log-level DEBUG
+        --log-level info
         --debug-webhooks
         --no-ledger
     healthcheck:
@@ -41,7 +41,7 @@
         --wallet-name holder
         --wallet-key insecure
         --auto-provision
-        --log-level DEBUG
+        --log-level info
         --debug-webhooks
         --no-ledger
     healthcheck:
