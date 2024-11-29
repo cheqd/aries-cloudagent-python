@@ -207,7 +207,7 @@ async def issue_credential_v2(
     issuer_cred_ex = await issuer.post(
         "/issue-credential-2.0/send",
         json={
-            "auto_issue": False,
+            "auto_issue": True,
             "auto_remove": False,
             "comment": "Credential from minimal example",
             "trace": False,
