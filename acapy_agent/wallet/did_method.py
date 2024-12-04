@@ -89,6 +89,12 @@ PEER4 = DIDMethod(
     rotation=False,
     holder_defined_did=HolderDefinedDid.NO,
 )
+CHEQD = DIDMethod(
+    name="cheqd",
+    key_types=[ED25519],
+    rotation=True,
+    holder_defined_did=HolderDefinedDid.ALLOWED,
+)
 
 TDW = DIDMethod(
     name="tdw",
@@ -109,6 +115,7 @@ class DIDMethods:
             WEB.method_name: WEB,
             PEER2.method_name: PEER2,
             PEER4.method_name: PEER4,
+            CHEQD.method_name: CHEQD,
             TDW.method_name: TDW,
         }
 

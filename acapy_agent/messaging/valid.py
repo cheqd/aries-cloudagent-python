@@ -362,17 +362,76 @@ class IndyDID(Regexp):
         )
 
 
-class AnoncredsDID(Regexp):
-    """Validate value against indy DID."""
+class CheqdDID(Regexp):
+    """Validate value against cheqd DID."""
 
-    EXAMPLE = "did:(method):WgWxqztrNooG92RXvxSTWv"
-    PATTERN = re.compile("^(did:[a-z]:.+$)?$")
+    EXAMPLE = "did:cheqd:testnet:099be283-4302-40cc-9850-22016bcd1d86"
+
+    UUID = r"([a-z,0-9,-]{36,36})"
+    ID_CHAR = r"(?:[a-zA-Z0-9]{21,22}|" + UUID + ")"
+    NETWORK = r"(testnet|mainnet)"
+    METHOD_ID = r"(?:" + ID_CHAR + r"*:)*(" + ID_CHAR + r"+)"
+    QUERY = r"([?][^#]*)?"
+    PARAMS = r"((;[a-zA-Z0-9_.:%-]+=[a-zA-Z0-9_.:%-]*)*)"
+
+    PATTERN = re.compile(
+        rf"^(did:cheqd:{NETWORK}:{METHOD_ID}{PARAMS}{QUERY}|did:cheqd:{NETWORK}:{METHOD_ID}/resources/{UUID}{QUERY})$"
+    )
+
+    RESOURCE_ID_PATTERN = re.compile(
+        rf"^did:cheqd:{NETWORK}:{METHOD_ID}/resources/{UUID}"
+    )
 
     def __init__(self):
         """Initialize the instance."""
 
         super().__init__(
-            IndyDID.PATTERN,
+            CheqdDID.PATTERN,
+            error="Value {input} is not an cheqd decentralized identifier (DID)",
+        )
+
+
+class CheqdCredDefId(Regexp):
+    """Validate value against cheqd credential definition identifier specification."""
+
+    EXAMPLE = "did:cheqd:testnet:8a7e756c-d3b5-4947-af99-2dcd2e8cc5a2/resources/83f06db5-"
+    PATTERN = CheqdDID.RESOURCE_ID_PATTERN.pattern
+
+    def __init__(self):
+        """Initialize the instance."""
+
+        super().__init__(
+            CheqdCredDefId.PATTERN,
+            error="Value {input} is not an indy credential definition identifier",
+        )
+
+
+class CheqdSchemaId(Regexp):
+    """Validate value against cheqd schema identifier specification."""
+
+    EXAMPLE = "did:cheqd:testnet:8a7e756c-d3b5-4947-af99-2dcd2e8cc5a2/resources/e8cc28f2-"
+    PATTERN = CheqdDID.RESOURCE_ID_PATTERN.pattern
+
+    def __init__(self):
+        """Initialize the instance."""
+
+        super().__init__(
+            CheqdSchemaId.PATTERN,
+            error="Value {input} is not an indy schema identifier",
+        )
+
+
+class AnoncredsDID(Regexp):
+    """Validate value against indy DID."""
+
+    EXAMPLE = "did:(method):WgWxqztrNooG92RXvxSTWv"
+    PATTERN = re.compile("^(did:[a-z]:.+$)?$" + "|" + CheqdDID.PATTERN.pattern)
+
+    def __init__(self):
+        """Initialize the instance."""
+
+        super().__init__(
+            AnoncredsDID.PATTERN,
             error="Value {input} is not an decentralized identifier (DID)",
         )
 
@@ -479,13 +538,13 @@ class AnoncredsCredDefId(Regexp):
     """Validate value against anoncreds credential definition identifier specification."""
 
     EXAMPLE = "did:(method):3:CL:20:tag"
-    PATTERN = r"^(.+$)"
+    PATTERN = re.compile(IndyCredDefId.PATTERN + "|" + CheqdCredDefId.PATTERN)
 
     def __init__(self):
         """Initialize the instance."""
 
         super().__init__(
-            IndyCredDefId.PATTERN,
+            AnoncredsCredDefId.PATTERN,
             error="Value {input} is not an anoncreds credential definition identifier",
         )
 
@@ -524,13 +583,13 @@ class AnoncredsSchemaId(Regexp):
     """Validate value against indy schema identifier specification."""
 
     EXAMPLE = "did:(method):2:schema_name:1.0"
-    PATTERN = r"^(.+$)"
+    PATTERN = re.compile(IndySchemaId.PATTERN + "|" + CheqdSchemaId.PATTERN)
 
     def __init__(self):
         """Initialize the instance."""
 
         super().__init__(
-            IndySchemaId.PATTERN,
+            AnoncredsSchemaId.PATTERN,
             error="Value {input} is not an anoncreds schema identifier",
         )
 
@@ -1018,6 +1077,15 @@ ROUTING_KEY_EXAMPLE = RoutingKey.EXAMPLE
 
 INDY_DID_VALIDATE = IndyDID()
 INDY_DID_EXAMPLE = IndyDID.EXAMPLE
+
+CHEQD_DID_VALIDATE = CheqdDID()
+CHEQD_DID_EXAMPLE = CheqdDID.EXAMPLE
+
+CHEQD_SCHEMA_ID_VALIDATE = CheqdSchemaId()
+CHEQD_SCHEMA_ID_EXAMPLE = CheqdSchemaId.EXAMPLE
+
+CHEQD_CRED_DEF_ID_VALIDATE = CheqdCredDefId()
+CHEQD_CRED_DEF_ID_EXAMPLE = CheqdCredDefId.EXAMPLE
 
 GENERIC_DID_VALIDATE = MaybeIndyDID()
 GENERIC_DID_EXAMPLE = MaybeIndyDID.EXAMPLE
