@@ -27,6 +27,9 @@ from ...models.revocation import (
     RevListResult,
     RevRegDef,
     RevRegDefResult,
+    RevRegDefValue,
+    RevRegDefState,
+    RevListState,
 )
 from ...models.schema import (
     AnonCredsSchema,
@@ -245,7 +248,29 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
         self, profile: Profile, revocation_registry_id: str
     ) -> GetRevRegDefResult:
         """Get a revocation registry definition from the registry."""
-        raise NotImplementedError()
+        revocation_registry_definition = await self.resolver.resolve_resource(
+            revocation_registry_id
+        )
+        (did, resource_id) = self.split_schema_id(revocation_registry_id)
+
+        anoncreds_revocation_registry_definition = RevRegDef(
+            issuer_id=did,
+            cred_def_id=revocation_registry_definition["cred_def_id"],
+            type=revocation_registry_definition["type"],
+            tag=revocation_registry_definition["tag"],
+            value=RevRegDefValue.deserialize(revocation_registry_definition["value"]),
+        )
+
+        return GetRevRegDefResult(
+            revocation_registry_id=revocation_registry_id,
+            revocation_registry=anoncreds_revocation_registry_definition,
+            revocation_registry_metadata={},
+            resolution_metadata={
+                "resource_id": resource_id,
+                "resource_name": anoncreds_revocation_registry_definition.tag,
+                "resource_type": "anonCredsCredDef",
+            },
+        )
 
     async def register_revocation_registry_definition(
         self,
@@ -254,7 +279,45 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
         options: Optional[dict] = None,
     ) -> RevRegDefResult:
         """Register a revocation registry definition on the registry."""
-        raise NotImplementedError()
+
+        did = revocation_registry_definition.issuer_id
+        resource_type = "anonCredsRevRegDef"
+        rev_reg_def = {
+            "name": revocation_registry_definition.tag,
+            "type": resource_type,
+            "data": dict_to_b64(
+                {
+                    "type": revocation_registry_definition.type,
+                    "tag": revocation_registry_definition.tag,
+                    "value": revocation_registry_definition.value.serialize(),
+                    "credentialDefinitionId": revocation_registry_definition.cred_def_id,
+                }
+            ),
+            "version": str(uuid4()),
+        }
+
+        resource_state = await self._create_and_publish_resource(
+            profile, did, rev_reg_def
+        )
+        job_id = resource_state.get("jobId")
+        resource = resource_state.get("resource")
+        resource_id = resource.get("id")
+        resource_name = revocation_registry_definition.tag
+
+        return RevRegDefResult(
+            job_id,
+            revocation_registry_definition_state=RevRegDefState(
+                state=RevRegDefState.STATE_FINISHED,
+                revocation_registry_definition_id=resource_id,
+                revocation_registry_definition=revocation_registry_definition,
+            ),
+            registration_metadata={
+                "resource_id": resource_id,
+                "resource_name": resource_name,
+                "resource_type": resource_type,
+            },
+            revocation_registry_definition_metadata={},
+        )
 
     async def get_revocation_list(
         self,
@@ -264,7 +327,35 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
         timestamp_to: Optional[int] = None,
     ) -> GetRevListResult:
         """Get a revocation list from the registry."""
-        raise NotImplementedError()
+        revocation_registry_definition = await self.get_revocation_registry_definition(
+            profile,
+            revocation_registry_id,
+        )
+        revocation_registry_name = revocation_registry_definition.revocation_registry.tag
+        (did, resource_id) = self.split_schema_id(revocation_registry_id)
+
+        resource_type = "anonCredsStatusList"
+        status_list = await self.resolver.resolve_resource(
+            f"{did}?resourceType={resource_type}&resourceName={revocation_registry_name}&resourceVersionTime=${timestamp_to}"
+        )
+        revocation_list = RevList(
+            issuer_id=did,
+            rev_reg_def_id=revocation_registry_id,
+            revocation_list=status_list.get("revocationList"),
+            current_accumulator=status_list.get("currentAccumulator"),
+            timestamp=timestamp_to,  # fix: return timestamp from resolution metadata
+        )
+
+        return GetRevListResult(
+            revocation_list=revocation_list,
+            resolution_metadata={},
+            revocation_registry_metadata={
+                "resource_id": resource_id,
+                "resource_name": revocation_registry_name,
+                "resource_type": resource_type,
+            },
+            revocation_registry_id=revocation_registry_id,
+        )
 
     async def register_revocation_list(
         self,
@@ -274,19 +365,81 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
         options: Optional[dict] = None,
     ) -> RevListResult:
         """Register a revocation list on the registry."""
-        raise NotImplementedError()
+        resource_name = rev_reg_def.tag
+        resource_type = "anonCredsStatusLit"
+        rev_status_list = {
+            "name": resource_name,
+            "type": resource_type,
+            "data": dict_to_b64(
+                {
+                    "revocationList": rev_list.revocation_list,
+                    "currentAccumulator": rev_list.current_accumulator,
+                    "revocationRegDefId": rev_list.rev_reg_def_id,
+                }
+            ),
+            "version": str(uuid4()),
+        }
+
+        resource_state = await self._create_and_publish_resource(
+            profile, rev_reg_def.issuer_id, rev_status_list
+        )
+        job_id = resource_state.get("jobId")
+        resource = resource_state.get("resource")
+        resource_id = resource.get("id")
+
+        return RevListResult(
+            job_id,
+            revocation_list_state=RevListState.STATE_FINISHED,
+            registration_metadata={},
+            revocation_list_metadata={
+                "resource_id": resource_id,
+                "resource_name": resource_name,
+                "resource_type": resource_type,
+            },
+        )
 
     async def update_revocation_list(
         self,
         profile: Profile,
         rev_reg_def: RevRegDef,
-        prev_list: RevList,
+        _prev_list: RevList,
         curr_list: RevList,
         revoked: Sequence[int],
         options: Optional[dict] = None,
     ) -> RevListResult:
         """Update a revocation list on the registry."""
-        raise NotImplementedError()
+        resource_name = rev_reg_def.tag
+        resource_type = "anonCredsStatusLit"
+        rev_status_list = {
+            "name": resource_name,
+            "type": resource_type,
+            "data": dict_to_b64(
+                {
+                    "revocationList": curr_list.revocation_list,
+                    "currentAccumulator": curr_list.current_accumulator,
+                    "revocationRegDefId": curr_list.rev_reg_def_id,
+                }
+            ),
+            "version": str(uuid4()),
+        }
+
+        resource_state = await self._create_and_publish_resource(
+            profile, rev_reg_def.issuer_id, rev_status_list
+        )
+        job_id = resource_state.get("jobId")
+        resource = resource_state.get("resource")
+        resource_id = resource.get("id")
+
+        return RevListResult(
+            job_id,
+            revocation_list_state=RevListState.STATE_FINISHED,
+            registration_metadata={},
+            revocation_list_metadata={
+                "resource_id": resource_id,
+                "resource_name": resource_name,
+                "resource_type": resource_type,
+            },
+        )
 
     @staticmethod
     async def _create_and_publish_resource(

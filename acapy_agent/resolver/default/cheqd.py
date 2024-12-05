@@ -77,6 +77,7 @@ class CheqdDIDResolver(BaseDIDResolver):
                         raise ResolverError("Response was incorrectly formatted") from err
                 if response.status == 404:
                     raise DIDNotFound(f"No resource found for {did}")
+
             raise ResolverError(
                 "Could not find doc for {}: {}".format(did, await response.text())
             )
