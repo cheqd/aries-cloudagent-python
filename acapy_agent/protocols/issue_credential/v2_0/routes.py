@@ -40,6 +40,12 @@ from ....messaging.valid import (
     MAJOR_MINOR_VERSION_VALIDATE,
     UUID4_EXAMPLE,
     UUID4_VALIDATE,
+    CHEQD_DID_VALIDATE,
+    CHEQD_SCHEMA_ID_VALIDATE,
+    CHEQD_CRED_DEF_ID_VALIDATE,
+    CHEQD_CRED_DEF_ID_EXAMPLE,
+    CHEQD_SCHEMA_ID_EXAMPLE,
+    CHEQD_DID_EXAMPLE,
 )
 from ....storage.error import StorageError, StorageNotFoundError
 from ....utils.tracing import AdminAPIMessageTracingSchema, get_timer, trace_event
@@ -212,24 +218,24 @@ class V20CredFilterVCDISchema(OpenAPISchema):
 
     cred_def_id = fields.Str(
         required=False,
-        validate=INDY_CRED_DEF_ID_VALIDATE,
+        validate=CHEQD_CRED_DEF_ID_VALIDATE,
         metadata={
             "description": "Credential definition identifier",
-            "example": INDY_CRED_DEF_ID_EXAMPLE,
+            "example": CHEQD_CRED_DEF_ID_EXAMPLE,
         },
     )
     schema_id = fields.Str(
         required=False,
-        validate=INDY_SCHEMA_ID_VALIDATE,
+        validate=CHEQD_SCHEMA_ID_VALIDATE,
         metadata={
             "description": "Schema identifier",
-            "example": INDY_SCHEMA_ID_EXAMPLE,
+            "example": CHEQD_SCHEMA_ID_EXAMPLE,
         },
     )
     schema_issuer_did = fields.Str(
         required=False,
-        validate=INDY_DID_VALIDATE,
-        metadata={"description": "Schema issuer DID", "example": INDY_DID_EXAMPLE},
+        validate=CHEQD_DID_VALIDATE,
+        metadata={"description": "Schema issuer DID", "example": CHEQD_DID_EXAMPLE},
     )
     schema_name = fields.Str(
         required=False,
@@ -245,8 +251,8 @@ class V20CredFilterVCDISchema(OpenAPISchema):
     )
     issuer_did = fields.Str(
         required=False,
-        validate=INDY_DID_VALIDATE,
-        metadata={"description": "Credential issuer DID", "example": INDY_DID_EXAMPLE},
+        validate=CHEQD_DID_VALIDATE,
+        metadata={"description": "Credential issuer DID", "example": CHEQD_DID_EXAMPLE},
     )
 
 
