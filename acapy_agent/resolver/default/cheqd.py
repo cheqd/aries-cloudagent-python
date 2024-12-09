@@ -5,11 +5,20 @@ from typing import Optional, Pattern, Sequence, Text
 
 from aiohttp import ClientSession
 from pydid import DIDDocument
+from dataclasses import dataclass
 
 from ...config.injection_context import InjectionContext
 from ...core.profile import Profile
 from ...messaging.valid import CheqdDID
 from ..base import BaseDIDResolver, DIDNotFound, ResolverError, ResolverType
+
+
+@dataclass
+class DIDLinkedResourceWithMetadata:
+    """Schema for DID Linked Resource with metadata."""
+
+    resource: dict
+    metadata: dict
 
 
 class CheqdDIDResolver(BaseDIDResolver):
@@ -64,20 +73,44 @@ class CheqdDIDResolver(BaseDIDResolver):
                 "Could not find doc for {}: {}".format(did, await response.text())
             )
 
-    async def resolve_resource(self, did: str) -> dict:
-        """Resolve a Cheqd DID Linked Resource."""
+    async def resolve_resource(self, did: str) -> DIDLinkedResourceWithMetadata:
+        """Resolve a Cheqd DID Linked Resource and its Metadata."""
         async with ClientSession() as session:
+            # Fetch the main resource
+            async with session.get(self.DID_RESOLVER_BASE_URL + did) as response:
+                if response.status == 200:
+                    try:
+                        resource = await response.json()
+                    except Exception as err:
+                        raise ResolverError("Response was incorrectly formatted") from err
+                elif response.status == 404:
+                    raise DIDNotFound(f"No resource found for {did}")
+                else:
+                    raise ResolverError(
+                        f"Could not find resource for {did}: {await response.text()}"
+                    )
+
+            # Fetch the metadata
             async with session.get(
-                self.DID_RESOLVER_BASE_URL + did,
+                f"{self.DID_RESOLVER_BASE_URL}{did}&resourceMetadata=true"
+                if "resourceName" in did
+                else f"{self.DID_RESOLVER_BASE_URL}{did}/metadata"
             ) as response:
                 if response.status == 200:
                     try:
-                        return await response.json()
+                        result = await response.json()
+                        metadata = result.get("contentStream").get(
+                            "linkedResourceMetadata"
+                        )[0]
                     except Exception as err:
-                        raise ResolverError("Response was incorrectly formatted") from err
-                if response.status == 404:
-                    raise DIDNotFound(f"No resource found for {did}")
+                        raise ResolverError(
+                            "Metadata response was incorrectly formatted"
+                        ) from err
+                elif response.status == 404:
+                    raise DIDNotFound(f"No metadata found for {did}")
+                else:
+                    raise ResolverError(
+                        f"Could not find metadata for {did}: {await response.text()}"
+                    )
 
-            raise ResolverError(
-                "Could not find doc for {}: {}".format(did, await response.text())
-            )
+        return DIDLinkedResourceWithMetadata(resource=resource, metadata=metadata)

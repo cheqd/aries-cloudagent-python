@@ -200,11 +200,7 @@ class AnonCredsPresExchangeHandler(V20PresFormatHandler):
                 cred_def_id = proof["identifiers"][sub_proof_index]["cred_def_id"]
                 criteria = {
                     "schema_id": schema_id,
-                    "schema_issuer_did": schema_id.split(":")[-4],
-                    "schema_name": schema_id.split(":")[-2],
-                    "schema_version": schema_id.split(":")[-1],
                     "cred_def_id": cred_def_id,
-                    "issuer_did": cred_def_id.split(":")[-5],
                     f"attr::{name}::value": proof_value,
                 }
 
@@ -235,11 +231,7 @@ class AnonCredsPresExchangeHandler(V20PresFormatHandler):
                 cred_def_id = proof["identifiers"][sub_proof_index]["cred_def_id"]
                 criteria = {
                     "schema_id": schema_id,
-                    "schema_issuer_did": schema_id.split(":")[-4],
-                    "schema_name": schema_id.split(":")[-2],
-                    "schema_version": schema_id.split(":")[-1],
                     "cred_def_id": cred_def_id,
-                    "issuer_did": cred_def_id.split(":")[-5],
                     **{
                         f"attr::{name}::value": value
                         for name, value in proof_values.items()
@@ -296,11 +288,7 @@ class AnonCredsPresExchangeHandler(V20PresFormatHandler):
                 cred_def_id = proof["identifiers"][sub_proof_index]["cred_def_id"]
                 criteria = {
                     "schema_id": schema_id,
-                    "schema_issuer_did": schema_id.split(":")[-4],
-                    "schema_name": schema_id.split(":")[-2],
-                    "schema_version": schema_id.split(":")[-1],
                     "cred_def_id": cred_def_id,
-                    "issuer_did": cred_def_id.split(":")[-5],
                 }
 
                 if (
