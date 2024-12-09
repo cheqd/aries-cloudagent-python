@@ -402,7 +402,7 @@ class CheqdCredDefId(Regexp):
 
         super().__init__(
             CheqdCredDefId.PATTERN,
-            error="Value {input} is not an indy credential definition identifier",
+            error="Value {input} is not an cheqd credential definition identifier",
         )
 
 
@@ -417,7 +417,22 @@ class CheqdSchemaId(Regexp):
 
         super().__init__(
             CheqdSchemaId.PATTERN,
-            error="Value {input} is not an indy schema identifier",
+            error="Value {input} is not an cheqd schema identifier",
+        )
+
+
+class CheqdRevRegId(Regexp):
+    """Validate value against cheqd revocation registry specification."""
+
+    EXAMPLE = "did:cheqd:testnet:8a7e756c-d3b5-4947-af99-2dcd2e8cc5a2/resources/83f06db5-"
+    PATTERN = CheqdDID.RESOURCE_ID_PATTERN.pattern
+
+    def __init__(self):
+        """Initialize the instance."""
+
+        super().__init__(
+            CheqdRevRegId.PATTERN,
+            error="Value {input} is not an cheqd credential definition identifier",
         )
 
 
@@ -1086,6 +1101,9 @@ CHEQD_SCHEMA_ID_EXAMPLE = CheqdSchemaId.EXAMPLE
 
 CHEQD_CRED_DEF_ID_VALIDATE = CheqdCredDefId()
 CHEQD_CRED_DEF_ID_EXAMPLE = CheqdCredDefId.EXAMPLE
+
+CHEQD_REV_REG_ID_VALIDATE = CheqdRevRegId()
+CHEQD_REV_REG_ID_EXAMPLE = CheqdRevRegId.EXAMPLE
 
 GENERIC_DID_VALIDATE = MaybeIndyDID()
 GENERIC_DID_EXAMPLE = MaybeIndyDID.EXAMPLE
