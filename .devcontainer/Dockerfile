@@ -17,5 +17,6 @@ RUN curl -sSL https://install.python-poetry.org | python3 - \
 
 COPY pyproject.toml poetry.lock ./
 RUN poetry config virtualenvs.create false \
+    && poetry lock --no-update \
     && poetry install --no-root --no-interaction -E "askar didcommv2" \
     && rm -rf /root/.cache/pypoetry
