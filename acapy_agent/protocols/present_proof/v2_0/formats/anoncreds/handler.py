@@ -197,8 +197,13 @@ class AnonCredsPresExchangeHandler(V20PresFormatHandler):
                 name = proof_req_attr_spec["name"]
                 proof_value = attr_spec["raw"]
                 sub_proof_index = attr_spec["sub_proof_index"]
+                registry = self.profile.inject(AnonCredsRegistry)
                 schema_id = proof["identifiers"][sub_proof_index]["schema_id"]
+                schema_info = await registry.get_schema(self.profile, schema_id)
                 cred_def_id = proof["identifiers"][sub_proof_index]["cred_def_id"]
+                cred_def_info = await registry.get_credential_definition(
+                    self.profile, cred_def_id
+                )
                 criteria = {
                     "schema_id": schema_id,
                     "schema_issuer_did": schema_info.schema_value.issuer_id,
