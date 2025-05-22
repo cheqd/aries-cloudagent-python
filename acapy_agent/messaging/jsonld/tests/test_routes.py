@@ -3,6 +3,7 @@ from copy import deepcopy
 from unittest import IsolatedAsyncioTestCase
 
 import pytest
+import pytest_asyncio
 from aiohttp import web
 from pyld import jsonld
 
@@ -81,7 +82,7 @@ def mock_verify_credential():
     test_module.verify_credential = temp
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def mock_sign_request(mock_sign_credential):
     profile = await create_test_profile(
         settings={
@@ -139,7 +140,7 @@ def request_body():
     }
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def mock_verify_request(mock_verify_credential, mock_resolver, request_body):
     profile = await create_test_profile(
         settings={
@@ -302,6 +303,10 @@ class TestJSONLDRoutes(IsolatedAsyncioTestCase):
             __getitem__=lambda _, k: self.request_dict[k],
             headers={"x-api-key": "secret-key"},
         )
+
+    async def asyncTearDown(self):
+        # Ensure the event loop is closed
+        await self.profile.close()
 
     async def test_verify_credential(self):
         POSTED_REQUEST = {  # posted json

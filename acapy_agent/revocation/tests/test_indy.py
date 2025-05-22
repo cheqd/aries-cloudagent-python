@@ -1,9 +1,7 @@
 from unittest import IsolatedAsyncioTestCase
 
 from ...ledger.base import BaseLedger
-from ...ledger.multiple_ledger.ledger_requests_executor import (
-    IndyLedgerRequestsExecutor,
-)
+from ...ledger.multiple_ledger.ledger_requests_executor import IndyLedgerRequestsExecutor
 from ...multitenant.base import BaseMultitenantManager
 from ...multitenant.manager import MultitenantManager
 from ...storage.error import StorageNotFoundError
@@ -95,6 +93,7 @@ class TestIndyRevocation(IsolatedAsyncioTestCase):
 
     async def test_get_active_issuer_rev_reg_record(self):
         CRED_DEF_ID = f"{self.test_did}:3:CL:1234:default"
+        self.profile.context.injector.bind_instance(BaseLedger, self.ledger)
         rec = await self.revoc.init_issuer_registry(CRED_DEF_ID)
         rec.revoc_reg_id = "dummy"
         rec.state = IssuerRevRegRecord.STATE_ACTIVE
@@ -150,7 +149,7 @@ class TestIndyRevocation(IsolatedAsyncioTestCase):
         CRED_DEF_ID = [f"{self.test_did}:3:CL:{i}:default" for i in (4321, 8765)]
 
         for cd_id in CRED_DEF_ID:
-            rec = await self.revoc.init_issuer_registry(cd_id)
+            await self.revoc.init_issuer_registry(cd_id)
 
         # 2 registries, both in init state (no listener to push into active)
         recs = await self.revoc.list_issuer_registries()

@@ -75,12 +75,8 @@ from ...models.revocation import (
     RevRegDefState,
     RevRegDefValue,
 )
-from ...models.schema import (
-    AnonCredsSchema,
-    GetSchemaResult,
-    SchemaResult,
-    SchemaState,
-)
+from ...models.schema import AnonCredsSchema, GetSchemaResult, SchemaResult, SchemaState
+from ...models.schema_info import AnonCredsSchemaInfo
 from ...revocation import (
     CATEGORY_REV_LIST,
     CATEGORY_REV_REG_DEF,
@@ -143,9 +139,9 @@ class LegacyIndyRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
         """Supported Identifiers Regular Expression."""
         return self._supported_identifiers_regex
 
-    async def setup(self, context: InjectionContext):
+    async def setup(self, context: InjectionContext) -> None:
         """Setup."""
-        print("Successfully registered LegacyIndyRegistry")
+        LOGGER.info("Successfully registered LegacyIndyRegistry")
 
     @staticmethod
     def make_schema_id(schema: AnonCredsSchema) -> str:
@@ -1231,8 +1227,13 @@ class LegacyIndyRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
         except LedgerError as err:
             raise AnonCredsRegistrationError(err.roll_up) from err
 
-    async def get_cred_def_info_by_id(self, cred_def_id: str) -> AnoncredsCredDefInfo:
-        """Get cred def info by cred def id."""
-        return AnoncredsCredDefInfo(
-            issuer_id=cred_def_id.split(":")[-5],
+    async def get_schema_info_by_id(
+        self, profile: Profile, schema_id: str
+    ) -> AnonCredsSchemaInfo:
+        """Get schema info by schema id."""
+        schema_id_parts = re.match(r"^(\w+):2:([^:]+):([^:]+)$", schema_id)
+        return AnonCredsSchemaInfo(
+            issuer_id=schema_id_parts.group(1),
+            name=schema_id_parts.group(2),
+            version=schema_id_parts.group(3),
         )

@@ -2,7 +2,6 @@
 
 import json
 import logging
-import re
 from abc import ABC, ABCMeta, abstractmethod
 from enum import Enum
 from hashlib import sha256
@@ -11,6 +10,7 @@ from typing import List, Optional, Sequence, Tuple, Union
 from ..indy.issuer import DEFAULT_CRED_DEF_TAG, IndyIssuer, IndyIssuerError
 from ..messaging.valid import IndyDID
 from ..utils import sentinel
+from ..utils.general import strip_did_prefix
 from ..wallet.did_info import DIDInfo
 from .endpoint_type import EndpointType
 from .error import (
@@ -174,21 +174,16 @@ class BaseLedger(ABC, metaclass=ABCMeta):
             next_seed: seed for incoming ed25519 keypair (default random)
         """
 
-    def did_to_nym(self, did: str) -> str:
-        """Remove the ledger's DID prefix to produce a nym."""
-        if did:
-            return re.sub(r"^did:\w+:", "", did)
-
     @abstractmethod
     async def get_wallet_public_did(self) -> DIDInfo:
         """Fetch the public DID from the wallet."""
 
     @abstractmethod
-    async def get_txn_author_agreement(self, reload: bool = False):
+    async def get_txn_author_agreement(self, reload: bool = False) -> dict:
         """Get the current transaction author agreement, fetching it if necessary."""
 
     @abstractmethod
-    async def fetch_txn_author_agreement(self):
+    async def fetch_txn_author_agreement(self) -> dict:
         """Fetch the current AML and TAA from the ledger."""
 
     @abstractmethod
@@ -198,7 +193,7 @@ class BaseLedger(ABC, metaclass=ABCMeta):
         """Save a new record recording the acceptance of the TAA."""
 
     @abstractmethod
-    async def get_latest_txn_author_acceptance(self):
+    async def get_latest_txn_author_acceptance(self) -> dict:
         """Look up the latest TAA acceptance."""
 
     def taa_digest(self, version: str, text: str):
@@ -462,7 +457,7 @@ class BaseLedger(ABC, metaclass=ABCMeta):
         # check if cred def is on ledger already
         for test_tag in [tag] if tag else ["tag", DEFAULT_CRED_DEF_TAG]:
             credential_definition_id = issuer.make_credential_definition_id(
-                public_info.did, schema, signature_type, test_tag
+                strip_did_prefix(public_info.did), schema, signature_type, test_tag
             )
             ledger_cred_def = await self.fetch_credential_definition(
                 credential_definition_id
@@ -627,9 +622,7 @@ class BaseLedger(ABC, metaclass=ABCMeta):
             LedgerObjectAlreadyExistsError: If the schema already exists on the ledger.
 
         """
-        from acapy_agent.anoncreds.default.legacy_indy.registry import (
-            LegacyIndyRegistry,
-        )
+        from acapy_agent.anoncreds.default.legacy_indy.registry import LegacyIndyRegistry
 
         public_info = await self.get_wallet_public_did()
         if not public_info:
@@ -700,8 +693,7 @@ class BaseLedger(ABC, metaclass=ABCMeta):
                 )
                 if schema_info:
                     LOGGER.warning(
-                        "Schema already exists on ledger. Returning details."
-                        " Error: %s",
+                        "Schema already exists on ledger. Returning details. Error: %s",
                         e,
                     )
                     raise LedgerObjectAlreadyExistsError(

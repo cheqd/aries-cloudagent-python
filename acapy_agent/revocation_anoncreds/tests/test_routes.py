@@ -38,12 +38,12 @@ class TestRevocationRoutes(IsolatedAsyncioTestCase):
     async def test_validate_cred_rev_rec_qs_and_revoke_req(self):
         for req in (
             test_module.CredRevRecordQueryStringSchema(),
-            test_module.RevokeRequestSchemaAnoncreds(),
+            test_module.RevokeRequestSchemaAnonCreds(),
         ):
             req.validate_fields(
                 {
                     "rev_reg_id": test_module.ANONCREDS_REV_REG_ID_EXAMPLE,
-                    "cred_rev_id": test_module.INDY_CRED_REV_ID_EXAMPLE,
+                    "cred_rev_id": test_module.ANONCREDS_CRED_REV_ID_EXAMPLE,
                 }
             )
             req.validate_fields({"cred_ex_id": test_module.UUID4_EXAMPLE})
@@ -54,7 +54,9 @@ class TestRevocationRoutes(IsolatedAsyncioTestCase):
                     {"rev_reg_id": test_module.ANONCREDS_REV_REG_ID_EXAMPLE}
                 )
             with self.assertRaises(test_module.ValidationError):
-                req.validate_fields({"cred_rev_id": test_module.INDY_CRED_REV_ID_EXAMPLE})
+                req.validate_fields(
+                    {"cred_rev_id": test_module.ANONCREDS_CRED_REV_ID_EXAMPLE}
+                )
             with self.assertRaises(test_module.ValidationError):
                 req.validate_fields(
                     {
@@ -65,7 +67,7 @@ class TestRevocationRoutes(IsolatedAsyncioTestCase):
             with self.assertRaises(test_module.ValidationError):
                 req.validate_fields(
                     {
-                        "cred_rev_id": test_module.INDY_CRED_REV_ID_EXAMPLE,
+                        "cred_rev_id": test_module.ANONCREDS_CRED_REV_ID_EXAMPLE,
                         "cred_ex_id": test_module.UUID4_EXAMPLE,
                     }
                 )
@@ -73,7 +75,7 @@ class TestRevocationRoutes(IsolatedAsyncioTestCase):
                 req.validate_fields(
                     {
                         "rev_reg_id": test_module.ANONCREDS_REV_REG_ID_EXAMPLE,
-                        "cred_rev_id": test_module.INDY_CRED_REV_ID_EXAMPLE,
+                        "cred_rev_id": test_module.ANONCREDS_CRED_REV_ID_EXAMPLE,
                         "cred_ex_id": test_module.UUID4_EXAMPLE,
                     }
                 )

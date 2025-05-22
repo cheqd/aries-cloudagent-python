@@ -2,26 +2,24 @@
 
 import json
 import logging
-from typing import Mapping, Optional, Tuple
+from typing import List, Mapping, Optional, Tuple
 
-from anoncreds import CredentialDefinition, Schema
+from anoncreds import CredentialDefinition
 from marshmallow import RAISE
 
-from ......anoncreds.base import AnonCredsResolutionError
+from ......anoncreds.base import AnonCredsObjectNotFound, AnonCredsResolutionError
 from ......anoncreds.holder import AnonCredsHolder, AnonCredsHolderError
-from ......anoncreds.issuer import CATEGORY_CRED_DEF, CATEGORY_SCHEMA, AnonCredsIssuer
-from ......anoncreds.models.credential import AnoncredsCredentialSchema
-from ......anoncreds.models.credential_offer import AnoncredsCredentialOfferSchema
+from ......anoncreds.issuer import CATEGORY_CRED_DEF, AnonCredsIssuer
+from ......anoncreds.models.credential import AnonCredsCredentialSchema
+from ......anoncreds.models.credential_offer import AnonCredsCredentialOfferSchema
 from ......anoncreds.models.credential_proposal import (
-    AnoncredsCredentialDefinitionProposal,
+    AnonCredsCredentialDefinitionProposal,
 )
-from ......anoncreds.models.credential_request import AnoncredsCredRequestSchema
+from ......anoncreds.models.credential_request import AnonCredsCredRequestSchema
 from ......anoncreds.registry import AnonCredsRegistry
 from ......anoncreds.revocation import AnonCredsRevocation
 from ......cache.base import BaseCache
-from ......messaging.credential_definitions.util import (
-    CRED_DEF_SENT_RECORD_TYPE,
-)
+from ......messaging.credential_definitions.util import CRED_DEF_SENT_RECORD_TYPE
 from ......messaging.decorators.attach_decorator import AttachDecorator
 from ......revocation_anoncreds.models.issuer_cred_rev_record import IssuerCredRevRecord
 from ......storage.base import BaseStorage
@@ -38,14 +36,14 @@ from ...messages.cred_offer import V20CredOffer
 from ...messages.cred_proposal import V20CredProposal
 from ...messages.cred_request import V20CredRequest
 from ...models.cred_ex_record import V20CredExRecord
-from ...models.detail.anoncreds import V20CredExRecordAnoncreds
+from ...models.detail.anoncreds import V20CredExRecordAnonCreds
 from ..handler import CredFormatAttachment, V20CredFormatError, V20CredFormatHandler
 
 LOGGER = logging.getLogger(__name__)
 
 
 class AnonCredsCredFormatHandler(V20CredFormatHandler):
-    """Anoncreds credential format handler."""
+    """AnonCreds credential format handler."""
 
     format = V20CredFormat.Format.ANONCREDS
 
@@ -69,10 +67,10 @@ class AnonCredsCredFormatHandler(V20CredFormatHandler):
 
         """
         mapping = {
-            CRED_20_PROPOSAL: AnoncredsCredentialDefinitionProposal,
-            CRED_20_OFFER: AnoncredsCredentialOfferSchema,
-            CRED_20_REQUEST: AnoncredsCredRequestSchema,
-            CRED_20_ISSUE: AnoncredsCredentialSchema,
+            CRED_20_PROPOSAL: AnonCredsCredentialDefinitionProposal,
+            CRED_20_OFFER: AnonCredsCredentialOfferSchema,
+            CRED_20_REQUEST: AnonCredsCredRequestSchema,
+            CRED_20_ISSUE: AnonCredsCredentialSchema,
         }
 
         # Get schema class
@@ -81,7 +79,7 @@ class AnonCredsCredFormatHandler(V20CredFormatHandler):
         # Validate, throw if not valid
         Schema(unknown=RAISE).load(attachment_data)
 
-    async def get_detail_record(self, cred_ex_id: str) -> V20CredExRecordAnoncreds:
+    async def get_detail_record(self, cred_ex_id: str) -> V20CredExRecordAnonCreds:
         """Retrieve credential exchange detail record by cred_ex_id."""
 
         async with self.profile.session() as session:
@@ -204,15 +202,54 @@ class AnonCredsCredFormatHandler(V20CredFormatHandler):
             offer_json = await issuer.create_credential_offer(cred_def_id)
             return json.loads(offer_json)
 
-        async with self.profile.session() as session:
-            cred_def_entry = await session.handle.fetch(CATEGORY_CRED_DEF, cred_def_id)
-            cred_def_dict = CredentialDefinition.load(cred_def_entry.value).to_dict()
-            schema_entry = await session.handle.fetch(
-                CATEGORY_SCHEMA, cred_def_dict["schemaId"]
-            )
-            schema_dict = Schema.load(schema_entry.value).to_dict()
+        async def _get_attr_names(schema_id) -> List[str] | None:
+            """Fetch attribute names for a given schema ID from the registry."""
+            if not schema_id:
+                return None
+            try:
+                schema_result = await registry.get_schema(self.profile, schema_id)
+                return schema_result.schema.attr_names
+            except AnonCredsObjectNotFound:
+                LOGGER.info(f"Schema not found for schema_id={schema_id}")
+                return None
+            except AnonCredsResolutionError as e:
+                LOGGER.warning(f"Schema resolution failed for schema_id={schema_id}: {e}")
+                return None
 
-        schema_attrs = set(schema_dict["attrNames"])
+        async def _fetch_schema_attr_names(
+            anoncreds_attachment, cred_def_id
+        ) -> List[str] | None:
+            """Determine schema attribute names from schema_id or cred_def_id."""
+            schema_id = anoncreds_attachment.get("schema_id")
+            attr_names = await _get_attr_names(schema_id)
+
+            if attr_names:
+                return attr_names
+
+            if cred_def_id:
+                async with self.profile.session() as session:
+                    cred_def_entry = await session.handle.fetch(
+                        CATEGORY_CRED_DEF, cred_def_id
+                    )
+                    cred_def_dict = CredentialDefinition.load(
+                        cred_def_entry.value
+                    ).to_dict()
+                    return await _get_attr_names(cred_def_dict.get("schemaId"))
+
+            return None
+
+        attr_names = None
+        registry = self.profile.inject(AnonCredsRegistry)
+
+        attr_names = await _fetch_schema_attr_names(anoncreds_attachment, cred_def_id)
+
+        if not attr_names:
+            raise V20CredFormatError(
+                "Could not determine schema attributes. If you did not create the "
+                "schema, then you need to provide the schema_id."
+            )
+
+        schema_attrs = set(attr_names)
         preview_attrs = set(cred_proposal_message.credential_preview.attr_dict())
         if preview_attrs != schema_attrs:
             raise V20CredFormatError(
@@ -246,7 +283,7 @@ class AnonCredsCredFormatHandler(V20CredFormatHandler):
         """Create anoncreds credential request."""
         if cred_ex_record.state != V20CredExRecord.STATE_OFFER_RECEIVED:
             raise V20CredFormatError(
-                "Anoncreds issue credential format cannot start from credential request"
+                "AnonCreds issue credential format cannot start from credential request"
             )
 
         await self._check_uniqueness(cred_ex_record.cred_ex_id)
@@ -300,7 +337,7 @@ class AnonCredsCredFormatHandler(V20CredFormatHandler):
         if not cred_req_result:
             cred_req_result = await _create()
 
-        detail_record = V20CredExRecordAnoncreds(
+        detail_record = V20CredExRecordAnonCreds(
             cred_ex_id=cred_ex_record.cred_ex_id,
             cred_request_metadata=cred_req_result["metadata"],
         )
@@ -316,7 +353,7 @@ class AnonCredsCredFormatHandler(V20CredFormatHandler):
         """Receive anoncreds credential request."""
         if not cred_ex_record.cred_offer:
             raise V20CredFormatError(
-                "Anoncreds issue credential format cannot start from credential request"
+                "AnonCreds issue credential format cannot start from credential request"
             )
 
     async def issue_credential(
@@ -357,7 +394,7 @@ class AnonCredsCredFormatHandler(V20CredFormatHandler):
         result = self.get_format_data(CRED_20_ISSUE, json.loads(cred_json))
 
         async with self._profile.transaction() as txn:
-            detail_record = V20CredExRecordAnoncreds(
+            detail_record = V20CredExRecordAnonCreds(
                 cred_ex_id=cred_ex_record.cred_ex_id,
                 rev_reg_id=rev_reg_def_id,
                 cred_rev_id=cred_rev_id,

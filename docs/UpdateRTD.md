@@ -10,7 +10,11 @@ evolves, the RTD files need to be regenerated and possibly updated, as described
 
 To test generate and view the RTD documentation locally, you must install [Sphinx](https://www.sphinx-doc.org/en/master/) and the
 [Sphinx RTD theme](https://pypi.org/project/sphinx-rtd-theme/). Follow the instructions on the respective pages to install
-and verify the installation on your system.
+and verify the installation on your system. Alternatively, use pip to install it:
+
+``` bash
+pip install -r docs/requirements.txt --upgrade
+```
 
 ### Generate Module Files
 
@@ -34,6 +38,9 @@ cd docs; sphinx-build -b html -a -E -c ./ ./ ./_build; cd ..
 
 Once generated, go into the `docs/_build` folder and open `index.html` in a browser. Note that the `_build` is
 `.gitignore`'d and so will not be part of a git push.
+
+If the script does not run at all, you may need to do a `pip install -r
+docs/requirements.txt` to update the Sphinx dependencies.
 
 ### Look for Errors
 

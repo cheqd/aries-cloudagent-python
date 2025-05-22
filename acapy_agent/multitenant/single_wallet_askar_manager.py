@@ -3,7 +3,7 @@
 from typing import Iterable, Optional, cast
 
 from ..askar.profile import AskarProfile
-from ..askar.profile_anon import AskarAnoncredsProfile
+from ..askar.profile_anon import AskarAnonCredsProfile
 from ..config.injection_context import InjectionContext
 from ..config.wallet import wallet_config
 from ..core.profile import Profile
@@ -71,11 +71,12 @@ class SingleWalletAskarMultitenantManager(BaseMultitenantManager):
                 "multitenant.wallet_name", self.DEFAULT_MULTITENANT_WALLET_NAME
             )
             context = base_context.copy()
+
             sub_wallet_settings = {
                 "wallet.recreate": False,
                 "wallet.seed": None,
-                "wallet.key": "",
-                "wallet.rekey": None,
+                "wallet.key": base_context.settings.get("wallet.key", ""),
+                "wallet.rekey": base_context.settings.get("wallet.rekey"),
                 "wallet.id": None,
                 "wallet.name": multitenant_wallet_name,
                 "wallet.type": "askar",
@@ -108,7 +109,7 @@ class SingleWalletAskarMultitenantManager(BaseMultitenantManager):
 
         # return anoncreds profile if explicitly set as wallet type
         if profile_context.settings.get("wallet.type") == "askar-anoncreds":
-            return AskarAnoncredsProfile(
+            return AskarAnonCredsProfile(
                 self._multitenant_profile.opened,
                 profile_context,
                 profile_id=wallet_record.wallet_id,

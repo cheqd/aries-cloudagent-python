@@ -1,4 +1,4 @@
-"""Anoncreds Schema OpenAPI validators."""
+"""AnonCreds Schema OpenAPI validators."""
 
 from typing import Any, Dict, List, Optional
 
@@ -7,10 +7,7 @@ from marshmallow import EXCLUDE, fields
 from marshmallow.validate import OneOf
 
 from ...messaging.models.base import BaseModel, BaseModelSchema
-from ...messaging.valid import (
-    ANONCREDS_DID_EXAMPLE,
-    ANONCREDS_SCHEMA_ID_EXAMPLE,
-)
+from ...messaging.valid import ANONCREDS_DID_EXAMPLE, ANONCREDS_SCHEMA_ID_EXAMPLE
 
 
 class AnonCredsSchema(BaseModel):
@@ -44,7 +41,7 @@ class AnonCredsSchema(BaseModel):
         """Convert from native object."""
         return cls.deserialize(schema.to_dict())
 
-    def to_native(self):
+    def to_native(self) -> Schema:
         """Convert to native object."""
         return Schema.load(self.serialize())
 
@@ -64,6 +61,7 @@ class AnonCredsSchemaSchema(BaseModelSchema):
             "example": ANONCREDS_DID_EXAMPLE,
         },
         data_key="issuerId",
+        required=True,
     )
     attr_names = fields.List(
         fields.Str(
@@ -74,11 +72,15 @@ class AnonCredsSchemaSchema(BaseModelSchema):
         ),
         metadata={"description": "Schema attribute names"},
         data_key="attrNames",
+        required=True,
     )
     name = fields.Str(
-        metadata={"description": "Schema name", "example": "Example schema"}
+        metadata={"description": "Schema name", "example": "Example schema"},
+        required=True,
     )
-    version = fields.Str(metadata={"description": "Schema version", "example": "1.0"})
+    version = fields.Str(
+        metadata={"description": "Schema version", "example": "1.0"}, required=True
+    )
 
 
 class GetSchemaResult(BaseModel):

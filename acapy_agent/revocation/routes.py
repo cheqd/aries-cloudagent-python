@@ -62,10 +62,7 @@ from ..utils.profiles import is_anoncreds_profile_raise_web_exception
 from .error import RevocationError, RevocationNotSupportedError
 from .indy import IndyRevocation
 from .manager import RevocationManager, RevocationManagerError
-from .models.issuer_cred_rev_record import (
-    IssuerCredRevRecord,
-    IssuerCredRevRecordSchema,
-)
+from .models.issuer_cred_rev_record import IssuerCredRevRecord, IssuerCredRevRecordSchema
 from .models.issuer_rev_reg_record import IssuerRevRegRecord, IssuerRevRegRecordSchema
 from .util import (
     REVOCATION_ENTRY_EVENT,
@@ -1010,16 +1007,12 @@ async def update_rev_reg_revoked_state(request: web.BaseRequest):
     is_anoncreds_profile_raise_web_exception(profile)
 
     rev_reg_id = request.match_info["rev_reg_id"]
-
     apply_ledger_update = json.loads(request.query.get("apply_ledger_update", "false"))
     LOGGER.debug(
-        f"/revocation/registry/{rev_reg_id}/fix-revocation-entry-state request = {apply_ledger_update}"  # noqa: E501
+        "Update revocation state request for rev_reg_id = %s, apply_ledger_update = %s",
+        rev_reg_id,
+        apply_ledger_update,
     )
-
-    def _log_ledger_info(available_write_ledgers, write_ledger, pool):
-        LOGGER.debug(f"available write_ledgers = {available_write_ledgers}")
-        LOGGER.debug(f"write_ledger = {write_ledger}")
-        LOGGER.debug(f"write_ledger pool = {pool}")
 
     rev_reg_record = None
     genesis_transactions = None
@@ -1038,7 +1031,9 @@ async def update_rev_reg_revoked_state(request: web.BaseRequest):
             available_write_ledgers = await ledger_manager.get_write_ledgers()
             pool = write_ledger.pool
             genesis_transactions = pool.genesis_txns
-            _log_ledger_info(available_write_ledgers, write_ledger, pool)
+            LOGGER.debug("available write_ledgers = %s", available_write_ledgers)
+            LOGGER.debug("write_ledger = %s", write_ledger)
+            LOGGER.debug("write_ledger pool = %s", pool)
 
         if not genesis_transactions:
             raise web.HTTPInternalServerError(
@@ -1557,6 +1552,10 @@ def register_events(event_bus: EventBus):
         re.compile(f"^{REVOCATION_EVENT_PREFIX}{REVOCATION_ENTRY_EVENT}.*"),
         on_revocation_entry_event,
     )
+    event_bus.subscribe(
+        re.compile(f"^{REVOCATION_EVENT_PREFIX}REV_REG_ENTRY_TXN_FAILED.*"),
+        on_rev_reg_entry_txn_failed,
+    )
 
 
 async def on_revocation_registry_init_event(profile: Profile, event: Event):
@@ -1747,6 +1746,12 @@ async def on_revocation_registry_endorsed_event(profile: Profile, event: Event):
         )
 
 
+async def on_rev_reg_entry_txn_failed(profile: Profile, event: Event):
+    """Handle revocation registry entry transaction failed event."""
+    manager = RevocationManager(profile)
+    await manager.fix_and_publish_from_invalid_accum_err(event.payload.get("msg"))
+
+
 class TailsDeleteResponseSchema(OpenAPISchema):
     """Return schema for tails deletion."""
 
@@ -1779,11 +1784,16 @@ async def delete_tails(request: web.BaseRequest) -> json:
             return web.json_response({"message": str(e)})
     elif cred_def_id:
         async with session:
-            cred_reg = sorted(
+            records = sorted(
                 await IssuerRevRegRecord.query_by_cred_def_id(
                     session, cred_def_id, IssuerRevRegRecord.STATE_GENERATED
                 )
-            )[0]
+            )
+            if not records:
+                return web.json_response(
+                    {"message": "No tail files found for deletion"}, status=404
+                )
+            cred_reg = records[0]
         tails_path = cred_reg.tails_local_path
         main_dir_rev = os.path.dirname(tails_path)
         main_dir_cred = os.path.dirname(main_dir_rev)

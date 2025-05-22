@@ -2,6 +2,7 @@
 
 import abc
 import json
+import logging
 from functools import reduce
 from itertools import chain
 from os import environ
@@ -15,6 +16,8 @@ from ..utils.tracing import trace_event
 from .error import ArgsParseError
 from .plugin_settings import PLUGIN_CONFIG_KEY
 from .util import BoundedInt, ByteSize
+
+LOGGER = logging.getLogger(__name__)
 
 CAT_PROVISION = "general"
 CAT_START = "start"
@@ -63,7 +66,7 @@ class group:
 
 
 def create_argument_parser(*, prog: Optional[str] = None):
-    """Create am instance of an arg parser, force yaml format for external config."""
+    """Create an instance of an arg parser, force yaml format for external config."""
     return ArgumentParser(config_file_parser_class=YAMLConfigFileParser, prog=prog)
 
 
@@ -269,8 +272,7 @@ class DebugGroup(ArgumentGroup):
             action="store_true",
             env_var="ACAPY_DEBUG_CREDENTIALS",
             help=(
-                "Enable additional logging around credential exchanges. "
-                "Default: false."
+                "Enable additional logging around credential exchanges. Default: false."
             ),
         )
         parser.add_argument(
@@ -278,15 +280,14 @@ class DebugGroup(ArgumentGroup):
             action="store_true",
             env_var="ACAPY_DEBUG_PRESENTATIONS",
             help=(
-                "Enable additional logging around presentation exchanges. "
-                "Default: false."
+                "Enable additional logging around presentation exchanges. Default: false."
             ),
         )
         parser.add_argument(
             "--debug-webhooks",
             action="store_true",
             env_var="ACAPY_DEBUG_WEBHOOKS",
-            help=("Emit protocol state object as webhook. " "Default: false."),
+            help=("Emit protocol state object as webhook. Default: false."),
         )
         parser.add_argument(
             "--invite",
@@ -295,15 +296,6 @@ class DebugGroup(ArgumentGroup):
             help=(
                 "After startup, generate and print a new out-of-band connection "
                 "invitation URL. Default: false."
-            ),
-        )
-        parser.add_argument(
-            "--connections-invite",
-            action="store_true",
-            env_var="ACAPY_CONNECTIONS_INVITE",
-            help=(
-                "After startup, generate and print a new connections protocol "
-                "style invitation URL. Default: false."
             ),
         )
         parser.add_argument(
@@ -416,8 +408,7 @@ class DebugGroup(ArgumentGroup):
             action="store_true",
             env_var="ACAPY_AUTO_STORE_CREDENTIAL",
             help=(
-                "Automatically store an issued credential upon receipt. "
-                "Default: false."
+                "Automatically store an issued credential upon receipt. Default: false."
             ),
         )
         parser.add_argument(
@@ -425,8 +416,7 @@ class DebugGroup(ArgumentGroup):
             action="store_true",
             env_var="ACAPY_AUTO_VERIFY_PRESENTATION",
             help=(
-                "Automatically verify a presentation when it is received. "
-                "Default: false."
+                "Automatically verify a presentation when it is received. Default: false."
             ),
         )
 
@@ -445,8 +435,6 @@ class DebugGroup(ArgumentGroup):
             settings["debug.seed"] = args.debug_seed
         if args.invite:
             settings["debug.print_invitation"] = True
-        if args.connections_invite:
-            settings["debug.print_connections_invitation"] = True
         if args.invite_label:
             settings["debug.invite_label"] = args.invite_label
         if args.invite_multi_use:
@@ -922,56 +910,80 @@ class LedgerGroup(ArgumentGroup):
         if args.no_ledger:
             settings["ledger.disabled"] = True
         else:
-            single_configured = False
-            multi_configured = False
             update_pool_name = False
             write_ledger_specified = False
 
             if args.read_only_ledger:
+                LOGGER.debug("Setting read-only ledger")
                 settings["read_only_ledger"] = True
+
+            single_configured = True
             if args.genesis_url:
+                LOGGER.debug("Setting ledger.genesis_url = %s", args.genesis_url)
                 settings["ledger.genesis_url"] = args.genesis_url
-                single_configured = True
             elif args.genesis_file:
+                LOGGER.debug("Setting ledger.genesis_file = %s", args.genesis_file)
                 settings["ledger.genesis_file"] = args.genesis_file
-                single_configured = True
             elif args.genesis_transactions:
+                LOGGER.debug("Setting ledger.genesis_transactions")
                 settings["ledger.genesis_transactions"] = args.genesis_transactions
-                single_configured = True
+            else:
+                LOGGER.debug("No genesis url, file, or transactions provided")
+                single_configured = False
+
+            multi_configured = False
             if args.genesis_transactions_list:
+                LOGGER.debug("Processing genesis_transactions_list")
                 with open(args.genesis_transactions_list, "r") as stream:
+                    # Load YAML configuration for multiple ledgers
                     txn_config_list = yaml.safe_load(stream)
                     ledger_config_list = []
+
+                    # Process each ledger configuration
                     for txn_config in txn_config_list:
-                        if "is_write" in txn_config and txn_config["is_write"]:
+                        # Check if this is a write ledger
+                        if txn_config.get("is_write", False):
                             write_ledger_specified = True
-                        if (
-                            "genesis_url" not in txn_config
-                            and "genesis_file" not in txn_config
-                            and "genesis_transactions" not in txn_config
-                        ):
+
+                        # Ensure genesis information is provided
+                        has_genesis_info = (
+                            "genesis_url" in txn_config
+                            or "genesis_file" in txn_config
+                            or "genesis_transactions" in txn_config
+                        )
+                        if not has_genesis_info:
                             raise ArgsParseError(
                                 "No genesis information provided for write ledger"
                             )
+
+                        # Use ID as pool_name if pool_name not specified
                         if "id" in txn_config and "pool_name" not in txn_config:
                             txn_config["pool_name"] = txn_config["id"]
+
                         update_pool_name = True
                         ledger_config_list.append(txn_config)
+
+                    # Ensure write ledger is specified unless in read-only mode
                     if not write_ledger_specified and not args.read_only_ledger:
                         raise ArgsParseError(
                             "No write ledger genesis provided in multi-ledger config"
                         )
+
+                    LOGGER.debug("Setting ledger.ledger_config_list")
                     settings["ledger.ledger_config_list"] = ledger_config_list
                     multi_configured = True
+
             if not (single_configured or multi_configured):
                 raise ArgsParseError(
-                    "One of --genesis-url --genesis-file, --genesis-transactions "
+                    "One of --genesis-url, --genesis-file, --genesis-transactions, "
                     "or --genesis-transactions-list must be specified (unless "
-                    "--no-ledger is specified to explicitly configure aca-py to"
-                    " run with no ledger)."
+                    "--no-ledger is specified to explicitly configure aca-py to "
+                    "run with no ledger)."
                 )
+
             if single_configured and multi_configured:
                 raise ArgsParseError("Cannot configure both single- and multi-ledger.")
+
             if args.ledger_pool_name and not update_pool_name:
                 settings["ledger.pool_name"] = args.ledger_pool_name
             if args.ledger_keepalive:
@@ -1467,24 +1479,12 @@ class MediationInviteGroup(ArgumentGroup):
                 "and send mediation request and set as default mediator."
             ),
         )
-        parser.add_argument(
-            "--mediator-connections-invite",
-            action="store_true",
-            env_var="ACAPY_MEDIATION_CONNECTIONS_INVITE",
-            help=(
-                "Connect to mediator through a connection invitation. "
-                "If not specified, connect using an OOB invitation. "
-                "Default: false."
-            ),
-        )
 
     def get_settings(self, args: Namespace):
         """Extract mediation invitation settings."""
         settings = {}
         if args.mediator_invitation:
             settings["mediation.invite"] = args.mediator_invitation
-        if args.mediator_connections_invite:
-            settings["mediation.connections_invite"] = True
 
         return settings
 

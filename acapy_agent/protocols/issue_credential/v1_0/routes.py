@@ -23,7 +23,10 @@ from ....ledger.error import LedgerError
 from ....messaging.credential_definitions.util import CRED_DEF_TAGS
 from ....messaging.models.base import BaseModelError
 from ....messaging.models.openapi import OpenAPISchema
-from ....messaging.models.paginated_query import PaginatedQuerySchema, get_limit_offset
+from ....messaging.models.paginated_query import (
+    PaginatedQuerySchema,
+    get_paginated_query_params,
+)
 from ....messaging.valid import (
     INDY_CRED_DEF_ID_EXAMPLE,
     INDY_CRED_DEF_ID_VALIDATE,
@@ -45,14 +48,8 @@ from .manager import CredentialManager, CredentialManagerError
 from .message_types import SPEC_URI
 from .messages.credential_problem_report import ProblemReportReason
 from .messages.credential_proposal import CredentialProposal, CredentialProposalSchema
-from .messages.inner.credential_preview import (
-    CredentialPreview,
-    CredentialPreviewSchema,
-)
-from .models.credential_exchange import (
-    V10CredentialExchange,
-    V10CredentialExchangeSchema,
-)
+from .messages.inner.credential_preview import CredentialPreview, CredentialPreviewSchema
+from .models.credential_exchange import V10CredentialExchange, V10CredentialExchangeSchema
 
 
 class IssueCredentialModuleResponseSchema(OpenAPISchema):
@@ -411,7 +408,7 @@ async def credential_exchange_list(request: web.BaseRequest):
         if request.query.get(k, "") != ""
     }
 
-    limit, offset = get_limit_offset(request)
+    limit, offset, order_by, descending = get_paginated_query_params(request)
 
     try:
         async with context.profile.session() as session:
@@ -420,6 +417,8 @@ async def credential_exchange_list(request: web.BaseRequest):
                 tag_filter=tag_filter,
                 limit=limit,
                 offset=offset,
+                order_by=order_by,
+                descending=descending,
                 post_filter_positive=post_filter,
             )
         results = [record.serialize() for record in records]
@@ -477,8 +476,7 @@ async def credential_exchange_retrieve(request: web.BaseRequest):
 @docs(
     tags=["issue-credential v1.0"],
     summary=(
-        "Create a credential record without "
-        "sending (generally for use with Out-Of-Band)"
+        "Create a credential record without sending (generally for use with Out-Of-Band)"
     ),
     deprecated=True,
 )

@@ -5,9 +5,7 @@ from unittest import IsolatedAsyncioTestCase
 import pytest
 
 from ....ledger.base import BaseLedger
-from ....ledger.multiple_ledger.ledger_requests_executor import (
-    IndyLedgerRequestsExecutor,
-)
+from ....ledger.multiple_ledger.ledger_requests_executor import IndyLedgerRequestsExecutor
 from ....tests import mock
 from ....utils.testing import create_test_profile
 from .. import holder, issuer, verifier
@@ -132,7 +130,7 @@ class TestIndyCredxIssuance(IsolatedAsyncioTestCase):
 
         assert not await self.holder.get_mime_type(cred_id, "name")
 
-        creds = await self.holder.get_credentials(None, None, None)
+        creds = await self.holder.get_credentials(offset=None, limit=None, wql=None)
         assert len(creds) == 1
         assert creds[0] == stored_cred
 
@@ -142,9 +140,9 @@ class TestIndyCredxIssuance(IsolatedAsyncioTestCase):
             await self.holder.get_credentials_for_presentation_request_by_referent(
                 PRES_REQ_NON_REV,
                 None,
-                0,
-                10,
-                {},
+                offset=0,
+                limit=10,
+                extra_query={},
             )
         )
         assert pres_creds == [
@@ -247,7 +245,7 @@ class TestIndyCredxIssuance(IsolatedAsyncioTestCase):
             assert found
             stored_cred = json.loads(found)
 
-            creds = await self.holder.get_credentials(None, None, None)
+            creds = await self.holder.get_credentials(offset=None, limit=None, wql=None)
             assert len(creds) == 1
             assert creds[0] == stored_cred
 
@@ -257,9 +255,9 @@ class TestIndyCredxIssuance(IsolatedAsyncioTestCase):
                 await self.holder.get_credentials_for_presentation_request_by_referent(
                     PRES_REQ_REV,
                     None,
-                    0,
-                    10,
-                    {},
+                    offset=0,
+                    limit=10,
+                    extra_query={},
                 )
             )
             assert pres_creds == [

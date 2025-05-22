@@ -8,8 +8,8 @@ from marshmallow import RAISE
 
 from ......anoncreds.holder import AnonCredsHolder
 from ......anoncreds.models.predicate import Predicate
-from ......anoncreds.models.presentation_request import AnoncredsPresentationRequestSchema
-from ......anoncreds.models.proof import AnoncredsProofSchema
+from ......anoncreds.models.presentation_request import AnonCredsPresentationRequestSchema
+from ......anoncreds.models.proof import AnonCredsProofSchema
 from ......anoncreds.models.utils import get_requested_creds_from_proof_request_preview
 from ......anoncreds.registry import AnonCredsRegistry
 from ......anoncreds.util import generate_pr_nonce
@@ -17,12 +17,7 @@ from ......anoncreds.verifier import AnonCredsVerifier
 from ......messaging.decorators.attach_decorator import AttachDecorator
 from ......messaging.util import canon
 from ....anoncreds.pres_exch_handler import AnonCredsPresExchHandler
-from ...message_types import (
-    ATTACHMENT_FORMAT,
-    PRES_20,
-    PRES_20_PROPOSAL,
-    PRES_20_REQUEST,
-)
+from ...message_types import ATTACHMENT_FORMAT, PRES_20, PRES_20_PROPOSAL, PRES_20_REQUEST
 from ...messages.pres import V20Pres
 from ...messages.pres_format import V20PresFormat
 from ...models.pres_exchange import V20PresExRecord
@@ -32,7 +27,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 class AnonCredsPresExchangeHandler(V20PresFormatHandler):
-    """Anoncreds presentation format handler."""
+    """AnonCreds presentation format handler."""
 
     format = V20PresFormat.Format.ANONCREDS
 
@@ -56,9 +51,9 @@ class AnonCredsPresExchangeHandler(V20PresFormatHandler):
 
         """
         mapping = {
-            PRES_20_REQUEST: AnoncredsPresentationRequestSchema,
-            PRES_20_PROPOSAL: AnoncredsPresentationRequestSchema,
-            PRES_20: AnoncredsProofSchema,
+            PRES_20_REQUEST: AnonCredsPresentationRequestSchema,
+            PRES_20_PROPOSAL: AnonCredsPresentationRequestSchema,
+            PRES_20: AnonCredsProofSchema,
         }
 
         # Get schema class
@@ -171,6 +166,13 @@ class AnonCredsPresExchangeHandler(V20PresFormatHandler):
             pres_ex_record=pres_ex_record,
             requested_credentials=requested_credentials,
         )
+
+        # This is used for the fallback to indy format. Should be removed when indy
+        # format retired
+        if request_data.get("indy"):
+            return IndyPresExchangeHandler(self.profile).get_format_data(
+                PRES_20, presentation_proof
+            )
         return self.get_format_data(PRES_20, presentation_proof)
 
     async def receive_pres(self, message: V20Pres, pres_ex_record: V20PresExRecord):
@@ -199,13 +201,18 @@ class AnonCredsPresExchangeHandler(V20PresFormatHandler):
                 sub_proof_index = attr_spec["sub_proof_index"]
                 schema_id = proof["identifiers"][sub_proof_index]["schema_id"]
                 cred_def_id = proof["identifiers"][sub_proof_index]["cred_def_id"]
+                registry = self.profile.inject(AnonCredsRegistry)
+                schema = await registry.get_schema(self.profile, schema_id)
+                cred_def = await registry.get_credential_definition(
+                    self.profile, cred_def_id
+                )
                 criteria = {
                     "schema_id": schema_id,
-                    "schema_issuer_did": schema_info.schema_value.issuer_id,
-                    "schema_name": schema_info.schema_value.name,
-                    "schema_version": schema_info.schema_value.version,
+                    "schema_issuer_did": schema.schema_value.issuer_id,
+                    "schema_name": schema.schema_value.name,
+                    "schema_version": schema.schema_value.version,
                     "cred_def_id": cred_def_id,
-                    "issuer_did": cred_def_info.credential_definition.issuer_id,
+                    "issuer_did": cred_def.credential_definition.issuer_id,
                     f"attr::{name}::value": proof_value,
                 }
 
@@ -236,16 +243,18 @@ class AnonCredsPresExchangeHandler(V20PresFormatHandler):
                 schema_id = proof["identifiers"][sub_proof_index]["schema_id"]
                 schema_info = await registry.get_schema(self.profile, schema_id)
                 cred_def_id = proof["identifiers"][sub_proof_index]["cred_def_id"]
-                cred_def_info = await registry.get_credential_definition(
+                registry = self.profile.inject(AnonCredsRegistry)
+                schema = await registry.get_schema(self.profile, schema_id)
+                cred_def = await registry.get_credential_definition(
                     self.profile, cred_def_id
                 )
                 criteria = {
                     "schema_id": schema_id,
-                    "schema_issuer_did": schema_info.schema_value.issuer_id,
-                    "schema_name": schema_info.schema_value.name,
-                    "schema_version": schema_info.schema_value.version,
+                    "schema_issuer_did": schema.schema_value.issuer_id,
+                    "schema_name": schema.schema_value.name,
+                    "schema_version": schema.schema_value.version,
                     "cred_def_id": cred_def_id,
-                    "issuer_did": cred_def_info.credential_definition.issuer_id,
+                    "issuer_did": cred_def.credential_definition.issuer_id,
                     **{
                         f"attr::{name}::value": value
                         for name, value in proof_values.items()
@@ -302,16 +311,18 @@ class AnonCredsPresExchangeHandler(V20PresFormatHandler):
                 schema_id = proof["identifiers"][sub_proof_index]["schema_id"]
                 schema_info = await registry.get_schema(self.profile, schema_id)
                 cred_def_id = proof["identifiers"][sub_proof_index]["cred_def_id"]
-                cred_def_info = await registry.get_credential_definition(
+                registry = self.profile.inject(AnonCredsRegistry)
+                schema = await registry.get_schema(self.profile, schema_id)
+                cred_def = await registry.get_credential_definition(
                     self.profile, cred_def_id
                 )
                 criteria = {
                     "schema_id": schema_id,
-                    "schema_issuer_did": schema_info.schema_value.issuer_id,
-                    "schema_name": schema_info.schema_value.name,
-                    "schema_version": schema_info.schema_value.version,
+                    "schema_issuer_did": schema.schema_value.issuer_id,
+                    "schema_name": schema.schema_value.name,
+                    "schema_version": schema.schema_value.version,
                     "cred_def_id": cred_def_id,
-                    "issuer_did": cred_def_info.credential_definition.issuer_id,
+                    "issuer_did": cred_def.credential_definition.issuer_id,
                 }
 
                 if (

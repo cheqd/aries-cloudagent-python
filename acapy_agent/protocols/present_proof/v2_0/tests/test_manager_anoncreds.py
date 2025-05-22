@@ -6,7 +6,13 @@ from unittest import IsolatedAsyncioTestCase
 import pytest
 
 from .....anoncreds.holder import AnonCredsHolder
-from .....anoncreds.models.cred_def_info import AnoncredsCredDefInfo
+from .....anoncreds.models.credential_definition import (
+    CredDef,
+    CredDefValue,
+    CredDefValuePrimary,
+    GetCredDefResult,
+)
+from .....anoncreds.models.schema import AnonCredsSchema, GetSchemaResult
 from .....anoncreds.registry import AnonCredsRegistry
 from .....anoncreds.verifier import AnonCredsVerifier
 from .....indy.models.pres_preview import (
@@ -37,12 +43,7 @@ from ..formats.dif.tests.test_handler import DIF_PRES_REQUEST_B as DIF_PRES_REQ
 from ..formats.handler import V20PresFormatHandlerError
 from ..formats.indy import handler as test_indy_handler
 from ..manager import V20PresManager, V20PresManagerError
-from ..message_types import (
-    ATTACHMENT_FORMAT,
-    PRES_20,
-    PRES_20_PROPOSAL,
-    PRES_20_REQUEST,
-)
+from ..message_types import ATTACHMENT_FORMAT, PRES_20, PRES_20_PROPOSAL, PRES_20_REQUEST
 from ..messages.pres import V20Pres
 from ..messages.pres_format import V20PresFormat
 from ..messages.pres_problem_report import V20PresProblemReport
@@ -472,8 +473,34 @@ class TestV20PresManagerAnonCreds(IsolatedAsyncioTestCase):
         )
         injector.bind_instance(AnonCredsHolder, self.holder)
         registry = mock.MagicMock(AnonCredsRegistry, autospec=True)
-        registry.get_cred_def_info_by_id = mock.CoroutineMock(
-            return_value=AnoncredsCredDefInfo(issuer_id=ISSUER_DID)
+        registry.get_schema = mock.CoroutineMock(
+            return_value=GetSchemaResult(
+                schema=AnonCredsSchema(
+                    issuer_id=ISSUER_DID,
+                    name="vidya",
+                    version="1.0",
+                    attr_names=["player", "screenCapture", "highScore"],
+                ),
+                schema_id=S_ID,
+                resolution_metadata={},
+                schema_metadata={},
+            )
+        )
+        registry.get_credential_definition = mock.CoroutineMock(
+            return_value=GetCredDefResult(
+                credential_definition_id="TUku9MDGa7QALbAJX4oAww:3:CL:531757:MYCO_Consent_Enablement",
+                credential_definition=CredDef(
+                    issuer_id=ISSUER_DID,
+                    schema_id=S_ID,
+                    tag="tag",
+                    type="CL",
+                    value=CredDefValue(
+                        primary=CredDefValuePrimary("n", "s", {}, "rctxt", "z")
+                    ),
+                ),
+                credential_definition_metadata={},
+                resolution_metadata={},
+            )
         )
         injector.bind_instance(AnonCredsRegistry, registry)
 
@@ -777,7 +804,7 @@ class TestV20PresManagerAnonCreds(IsolatedAsyncioTestCase):
 
             assert px_rec_out.state == V20PresExRecord.STATE_REQUEST_RECEIVED
 
-    @pytest.mark.skip(reason="Anoncreds-break")
+    @pytest.mark.skip(reason="AnonCreds-break")
     async def test_create_pres_indy(self):
         pres_request = V20PresRequest(
             formats=[
@@ -827,7 +854,7 @@ class TestV20PresManagerAnonCreds(IsolatedAsyncioTestCase):
             save_ex.assert_called_once()
             assert px_rec_out.state == V20PresExRecord.STATE_PRESENTATION_SENT
 
-    @pytest.mark.skip(reason="Anoncreds-break")
+    @pytest.mark.skip(reason="AnonCreds-break")
     async def test_create_pres_indy_and_dif(self):
         pres_request = V20PresRequest(
             formats=[
@@ -892,7 +919,7 @@ class TestV20PresManagerAnonCreds(IsolatedAsyncioTestCase):
             save_ex.assert_called_once()
             assert px_rec_out.state == V20PresExRecord.STATE_PRESENTATION_SENT
 
-    @pytest.mark.skip(reason="Anoncreds-break")
+    @pytest.mark.skip(reason="AnonCreds-break")
     async def test_create_pres_proof_req_non_revoc_interval_none(self):
         indy_proof_req_vcx = deepcopy(ANONCREDS_PROOF_REQ_NAME)
         indy_proof_req_vcx["non_revoked"] = None  # simulate interop with indy-vcx
@@ -954,7 +981,7 @@ class TestV20PresManagerAnonCreds(IsolatedAsyncioTestCase):
             save_ex.assert_called_once()
             assert px_rec_out.state == V20PresExRecord.STATE_PRESENTATION_SENT
 
-    @pytest.mark.skip(reason="Anoncreds-break")
+    @pytest.mark.skip(reason="AnonCreds-break")
     async def test_create_pres_self_asserted(self):
         pres_request = V20PresRequest(
             formats=[
@@ -1006,7 +1033,7 @@ class TestV20PresManagerAnonCreds(IsolatedAsyncioTestCase):
             save_ex.assert_called_once()
             assert px_rec_out.state == V20PresExRecord.STATE_PRESENTATION_SENT
 
-    @pytest.mark.skip(reason="Anoncreds-break")
+    @pytest.mark.skip(reason="AnonCreds-break")
     async def test_create_pres_no_revocation(self):
         self.ledger = mock.MagicMock(BaseLedger, autospec=True)
         self.ledger.get_schema = mock.CoroutineMock(return_value=mock.MagicMock())
@@ -1100,7 +1127,7 @@ class TestV20PresManagerAnonCreds(IsolatedAsyncioTestCase):
             await self.manager.create_pres(px_rec_in, request_data)
             mock_log_info.assert_called_once()
 
-    @pytest.mark.skip(reason="Anoncreds-break")
+    @pytest.mark.skip(reason="AnonCreds-break")
     async def test_create_pres_bad_revoc_state(self):
         pres_request = V20PresRequest(
             formats=[
@@ -1174,7 +1201,7 @@ class TestV20PresManagerAnonCreds(IsolatedAsyncioTestCase):
             with self.assertRaises(test_indy_util_module.AnonCredsHolderError):
                 await self.manager.create_pres(px_rec_in, request_data)
 
-    @pytest.mark.skip(reason="Anoncreds-break")
+    @pytest.mark.skip(reason="AnonCreds-break")
     async def test_create_pres_multi_matching_proposal_creds_names(self):
         pres_request = V20PresRequest(
             formats=[
@@ -1348,7 +1375,7 @@ class TestV20PresManagerAnonCreds(IsolatedAsyncioTestCase):
                 (px_rec_out, pres_msg) = await self.manager.create_pres(
                     px_rec_in, request_data
                 )
-            assert "AnonCreds interface requires AskarAnoncreds profile" in str(
+            assert "AnonCreds interface requires AskarAnonCreds profile" in str(
                 context.exception
             )
 
@@ -2146,7 +2173,7 @@ class TestV20PresManagerAnonCreds(IsolatedAsyncioTestCase):
                 context.exception
             )
 
-    @pytest.mark.skip(reason="Anoncreds-break")
+    @pytest.mark.skip(reason="AnonCreds-break")
     async def test_verify_pres(self):
         pres_request = V20PresRequest(
             formats=[
@@ -2196,7 +2223,7 @@ class TestV20PresManagerAnonCreds(IsolatedAsyncioTestCase):
 
             assert px_rec_out.state == (V20PresExRecord.STATE_DONE)
 
-    @pytest.mark.skip(reason="Anoncreds-break")
+    @pytest.mark.skip(reason="AnonCreds-break")
     async def test_verify_pres_indy_and_dif(self):
         pres_request = V20PresRequest(
             formats=[
