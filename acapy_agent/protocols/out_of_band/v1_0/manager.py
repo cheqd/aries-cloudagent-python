@@ -1067,12 +1067,12 @@ class OutOfBandManager(BaseConnectionManager):
             # in an out-of-band message (RFC 0434).
             # OR did:peer:2 or did:peer:4.
 
-            if service.startswith("did:peer"):
+            if service.startswith("did:sov"):
+                public_did = service.split(":")[-1]
+            else:
                 public_did = service
                 if public_did.startswith("did:peer:4"):
                     public_did = self.long_did_peer_to_short(public_did)
-            else:
-                public_did = service.split(":")[-1]
 
             # TODO: resolve_invitation should resolve key_info objects
             # or something else that includes the key type. We now assume
