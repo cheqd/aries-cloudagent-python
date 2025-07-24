@@ -58,20 +58,17 @@ class DefaultRevocationSetup(AnonCredsRevocationSetupManager):
     def __init__(self):
         """Init manager."""
 
-    def register_events(self, event_bus: EventBus):
+    def register_events(self, event_bus: EventBus) -> None:
         """Register event listeners."""
         event_bus.subscribe(CRED_DEF_FINISHED_PATTERN, self.on_cred_def)
         event_bus.subscribe(REV_REG_DEF_FINISHED_PATTERN, self.on_rev_reg_def)
         event_bus.subscribe(REV_LIST_FINISHED_PATTERN, self.on_rev_list)
 
-    async def on_cred_def(self, profile: Profile, event: CredDefFinishedEvent):
+    async def on_cred_def(self, profile: Profile, event: CredDefFinishedEvent) -> None:
         """Handle cred def finished."""
         payload = event.payload
-        auto_create_revocation = is_author_role(profile) and profile.settings.get(
-            "endorser.auto_create_rev_reg", False
-        )
 
-        if payload.support_revocation or auto_create_revocation:
+        if payload.support_revocation:
             revoc = AnonCredsRevocation(profile)
             for registry_count in range(self.INITIAL_REGISTRY_COUNT):
                 await revoc.create_and_register_revocation_registry_definition(
@@ -83,7 +80,9 @@ class DefaultRevocationSetup(AnonCredsRevocationSetupManager):
                     options=payload.options,
                 )
 
-    async def on_rev_reg_def(self, profile: Profile, event: RevRegDefFinishedEvent):
+    async def on_rev_reg_def(
+        self, profile: Profile, event: RevRegDefFinishedEvent
+    ) -> None:
         """Handle rev reg def finished."""
         payload = event.payload
 
@@ -95,14 +94,10 @@ class DefaultRevocationSetup(AnonCredsRevocationSetupManager):
 
         if auto_create_revocation:
             revoc = AnonCredsRevocation(profile)
-            failed_to_upload_tails = False
             try:
                 await revoc.upload_tails_file(payload.rev_reg_def)
             except AnonCredsRevocationError as err:
                 LOGGER.warning(f"Failed to upload tails file: {err}")
-                failed_to_upload_tails = True
-
-            if failed_to_upload_tails:
                 payload.options["failed_to_upload"] = True
 
             await revoc.create_and_register_revocation_list(
@@ -113,7 +108,7 @@ class DefaultRevocationSetup(AnonCredsRevocationSetupManager):
                 # Mark the first registry as active
                 await revoc.set_active_registry(payload.rev_reg_def_id)
 
-    async def on_rev_list(self, profile: Profile, event: RevListFinishedEvent):
+    async def on_rev_list(self, profile: Profile, event: RevListFinishedEvent) -> None:
         """Handle rev list finished."""
         await notify_revocation_published_event(
             profile, event.payload.rev_reg_id, event.payload.revoked

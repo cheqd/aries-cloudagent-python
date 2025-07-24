@@ -205,15 +205,15 @@ class IndyVerifier(ABC, metaclass=ABCMeta):
                                 f"{uuid}"
                             )
                             LOGGER.info(
-                                f"Timestamp {timestamp} from ledger for item"
-                                f"{uuid} falls outside non-revocation interval "
-                                f"{non_revoc_intervals[uuid]}"
+                                "Timestamp %s from ledger for item %s falls outside "
+                                "non-revocation interval %s",
+                                timestamp,
+                                uuid,
+                                non_revoc_intervals[uuid],
                             )
                 elif uuid in unrevealed_attrs:
                     # nothing to do, attribute value is not revealed
-                    msgs.append(
-                        f"{PresVerifyMsg.CT_UNREVEALED_ATTRIBUTES.value}::" f"{uuid}"
-                    )
+                    msgs.append(f"{PresVerifyMsg.CT_UNREVEALED_ATTRIBUTES.value}::{uuid}")
                 elif uuid not in self_attested:
                     raise ValueError(
                         f"Presentation attributes mismatch requested attribute {uuid}"
@@ -242,13 +242,14 @@ class IndyVerifier(ABC, metaclass=ABCMeta):
                         < non_revoc_intervals[uuid].get("to", now)
                     ):
                         msgs.append(
-                            f"{PresVerifyMsg.TSTMP_OUT_NON_REVOC_INTRVAL.value}::"
-                            f"{uuid}"
+                            f"{PresVerifyMsg.TSTMP_OUT_NON_REVOC_INTRVAL.value}::{uuid}"
                         )
-                        LOGGER.warning(
-                            f"Timestamp {timestamp} from ledger for item"
-                            f"{uuid} falls outside non-revocation interval "
-                            f"{non_revoc_intervals[uuid]}"
+                        LOGGER.info(
+                            "Timestamp %s from ledger for item %s falls outside "
+                            "non-revocation interval %s",
+                            timestamp,
+                            uuid,
+                            non_revoc_intervals[uuid],
                         )
 
         for uuid, req_pred in pres_req["requested_predicates"].items():
@@ -272,7 +273,7 @@ class IndyVerifier(ABC, metaclass=ABCMeta):
                     < non_revoc_intervals[uuid].get("to", now)
                 ):
                     msgs.append(
-                        f"{PresVerifyMsg.TSTMP_OUT_NON_REVOC_INTRVAL.value}::" f"{uuid}"
+                        f"{PresVerifyMsg.TSTMP_OUT_NON_REVOC_INTRVAL.value}::{uuid}"
                     )
                     LOGGER.warning(
                         f"Best-effort timestamp {timestamp} "
@@ -339,9 +340,7 @@ class IndyVerifier(ABC, metaclass=ABCMeta):
                 elif uuid in unrevealed_attrs:
                     # unrevealed attribute, nothing to do
                     pres_req_attr_spec = {}
-                    msgs.append(
-                        f"{PresVerifyMsg.CT_UNREVEALED_ATTRIBUTES.value}::" f"{uuid}"
-                    )
+                    msgs.append(f"{PresVerifyMsg.CT_UNREVEALED_ATTRIBUTES.value}::{uuid}")
                 elif uuid in self_attested:
                     if not req_attr.get("restrictions"):
                         continue

@@ -5,6 +5,7 @@ For Connection, DIDExchange and OutOfBand Manager.
 
 import json
 import logging
+import warnings
 from typing import Dict, List, Optional, Sequence, Text, Tuple, Union
 
 import pydid
@@ -28,14 +29,9 @@ from ..core.error import BaseError
 from ..core.profile import Profile
 from ..did.did_key import DIDKey
 from ..multitenant.base import BaseMultitenantManager
-from ..protocols.connections.v1_0.message_types import ARIES_PROTOCOL as CONN_PROTO
-from ..protocols.connections.v1_0.messages.connection_invitation import (
-    ConnectionInvitation,
-)
-from ..protocols.coordinate_mediation.v1_0.models.mediation_record import (
-    MediationRecord,
-)
+from ..protocols.coordinate_mediation.v1_0.models.mediation_record import MediationRecord
 from ..protocols.coordinate_mediation.v1_0.route_manager import RouteManager
+from ..protocols.didexchange.v1_0.message_types import ARIES_PROTOCOL as CONN_PROTO
 from ..protocols.discovery.v2_0.manager import V20DiscoveryMgr
 from ..protocols.out_of_band.v1_0.messages.invitation import InvitationMessage
 from ..resolver.base import ResolverError
@@ -301,6 +297,8 @@ class BaseConnectionManager:
     ) -> DIDDoc:
         """Create our DID doc for a given DID.
 
+        This method is deprecated and will be removed.
+
         Args:
             did_info (DIDInfo): The DID information (DID and verkey) used in the
                 connection.
@@ -313,6 +311,7 @@ class BaseConnectionManager:
             DIDDoc: The prepared `DIDDoc` instance.
 
         """
+        warnings.warn("create_did_document is deprecated and will be removed soon")
         did_doc = DIDDoc(did=did_info.did)
         did_controller = did_info.did
         did_key = did_info.verkey
@@ -467,6 +466,9 @@ class BaseConnectionManager:
         Returns verification methods for a DIDComm service to enable extracting
         key material.
         """
+        self._logger.debug(
+            "Getting recipient and routing keys for service %s", service.id
+        )
         resolver = self._profile.inject(DIDResolver)
         recipient_keys: List[VerificationMethod] = [
             await resolver.dereference_verification_method(
@@ -499,19 +501,28 @@ class BaseConnectionManager:
             BaseConnectionManagerError: If the public DID has no associated
                 DIDComm services.
         """
+        self._logger.debug("Resolving invitation for DID %s", did)
         doc, didcomm_services = await self.resolve_didcomm_services(did, service_accept)
         if not didcomm_services:
+            self._logger.warning("No DIDComm services found for DID %s", did)
             raise BaseConnectionManagerError(
                 "Cannot connect via public DID that has no associated DIDComm services"
             )
-
         first_didcomm_service, *_ = didcomm_services
+        self._logger.debug(
+            "DIDComm service (id %s) found for DID %s", first_didcomm_service.id, did
+        )
 
         endpoint = str(first_didcomm_service.service_endpoint)
         recipient_keys, routing_keys = await self.verification_methods_for_service(
             doc, first_didcomm_service
         )
-
+        self._logger.debug(
+            "DID %s has recipient keys %s and routing keys %s",
+            did,
+            recipient_keys,
+            routing_keys,
+        )
         return (
             endpoint,
             [self._extract_key_material_in_base58_format(key) for key in recipient_keys],
@@ -615,7 +626,7 @@ class BaseConnectionManager:
     async def _fetch_connection_targets_for_invitation(
         self,
         connection: ConnRecord,
-        invitation: Union[ConnectionInvitation, InvitationMessage],
+        invitation: InvitationMessage,
         sender_verkey: str,
     ) -> Sequence[ConnectionTarget]:
         """Get a list of connection targets for an invitation.
@@ -625,7 +636,7 @@ class BaseConnectionManager:
 
         Args:
             connection (ConnRecord): The connection record associated with the invitation.
-            invitation (Union[ConnectionInvitation, InvitationMessage]): The connection
+            invitation (InvitationMessage): The connection
                 or OOB invitation retrieved from the connection record.
             sender_verkey (str): The sender's verification key.
 
@@ -633,40 +644,23 @@ class BaseConnectionManager:
             Sequence[ConnectionTarget]: A list of `ConnectionTarget` objects
                 representing the connection targets for the invitation.
         """
-        if isinstance(invitation, ConnectionInvitation):
-            # conn protocol invitation
-            if invitation.did:
-                did = invitation.did
-                (
-                    endpoint,
-                    recipient_keys,
-                    routing_keys,
-                ) = await self.resolve_invitation(did)
+        assert invitation.services, "Schema requires services in invitation"
+        oob_service_item = invitation.services[0]
+        if isinstance(oob_service_item, str):
+            (
+                endpoint,
+                recipient_keys,
+                routing_keys,
+            ) = await self.resolve_invitation(oob_service_item)
 
-            else:
-                endpoint = invitation.endpoint
-                recipient_keys = invitation.recipient_keys
-                routing_keys = invitation.routing_keys
         else:
-            # out-of-band invitation
-            oob_service_item = invitation.services[0]
-            if isinstance(oob_service_item, str):
-                (
-                    endpoint,
-                    recipient_keys,
-                    routing_keys,
-                ) = await self.resolve_invitation(oob_service_item)
-
-            else:
-                endpoint = oob_service_item.service_endpoint
-                recipient_keys = [
-                    DIDKey.from_did(k).public_key_b58
-                    for k in oob_service_item.recipient_keys
-                ]
-                routing_keys = [
-                    DIDKey.from_did(k).public_key_b58
-                    for k in oob_service_item.routing_keys
-                ]
+            endpoint = oob_service_item.service_endpoint
+            recipient_keys = [
+                DIDKey.from_did(k).public_key_b58 for k in oob_service_item.recipient_keys
+            ]
+            routing_keys = [
+                DIDKey.from_did(k).public_key_b58 for k in oob_service_item.routing_keys
+            ]
 
         return [
             ConnectionTarget(
@@ -806,8 +800,8 @@ class BaseConnectionManager:
                         await entry.set_result([row.serialize() for row in targets], 3600)
                     else:
                         self._logger.debug(
-                            "Not caching connection targets for connection in "
-                            f"state ({connection.state})"
+                            "Not caching connection targets for connection in state %s",
+                            connection.state,
                         )
         else:
             if not connection:
@@ -1026,8 +1020,7 @@ class BaseConnectionManager:
                     receipt.recipient_did_public = True
             except InjectionError:
                 self._logger.warning(
-                    "Cannot resolve recipient verkey, no wallet defined by "
-                    "context: %s",
+                    "Cannot resolve recipient verkey, no wallet defined by context: %s",
                     receipt.recipient_verkey,
                 )
             except WalletNotFoundError:

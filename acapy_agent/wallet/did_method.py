@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Dict, List, Mapping, Optional
 
 from .error import BaseError
-from .key_type import BLS12381G2, ED25519, X25519, KeyType
+from .key_type import BLS12381G2, ED25519, P256, X25519, KeyType
 
 
 class HolderDefinedDid(Enum):
@@ -65,9 +65,15 @@ SOV = DIDMethod(
     rotation=True,
     holder_defined_did=HolderDefinedDid.ALLOWED,
 )
+INDY = DIDMethod(
+    name="indy",
+    key_types=[ED25519],
+    rotation=True,
+    holder_defined_did=HolderDefinedDid.ALLOWED,
+)
 KEY = DIDMethod(
     name="key",
-    key_types=[ED25519, BLS12381G2],
+    key_types=[ED25519, P256, BLS12381G2],
     rotation=False,
 )
 WEB = DIDMethod(
@@ -90,8 +96,8 @@ PEER4 = DIDMethod(
     holder_defined_did=HolderDefinedDid.NO,
 )
 
-TDW = DIDMethod(
-    name="tdw",
+WEBVH = DIDMethod(
+    name="webvh",
     key_types=[ED25519, X25519],
     rotation=False,
     holder_defined_did=HolderDefinedDid.NO,
@@ -105,11 +111,12 @@ class DIDMethods:
         """Construct did method registry."""
         self._registry: Dict[str, DIDMethod] = {
             SOV.method_name: SOV,
+            INDY.method_name: INDY,
             KEY.method_name: KEY,
             WEB.method_name: WEB,
             PEER2.method_name: PEER2,
             PEER4.method_name: PEER4,
-            TDW.method_name: TDW,
+            WEBVH.method_name: WEBVH,
         }
 
     def registered(self, method: str) -> bool:

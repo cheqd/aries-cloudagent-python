@@ -2,13 +2,13 @@
 
 import json
 
+from .....connections.base_manager import BaseConnectionManager
 from .....messaging.base_handler import (
     BaseHandler,
     BaseResponder,
     HandlerException,
     RequestContext,
 )
-from .....protocols.connections.v1_0.manager import ConnectionManager
 from ..manager import RoutingManager, RoutingManagerError
 from ..messages.forward import Forward
 
@@ -23,7 +23,7 @@ class ForwardHandler(BaseHandler):
 
         if not context.message_receipt.recipient_verkey:
             raise HandlerException("Cannot forward message: unknown recipient")
-        self._logger.info(
+        self._logger.debug(
             "Received forward for: %s", context.message_receipt.recipient_verkey
         )
 
@@ -39,7 +39,7 @@ class ForwardHandler(BaseHandler):
             return
 
         # load connection
-        connection_mgr = ConnectionManager(context.profile)
+        connection_mgr = BaseConnectionManager(context.profile)
         connection_targets = await connection_mgr.get_connection_targets(
             connection_id=recipient.connection_id
         )

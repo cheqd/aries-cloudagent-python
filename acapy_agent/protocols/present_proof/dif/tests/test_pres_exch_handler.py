@@ -11,7 +11,7 @@ from .....resolver.default.key import KeyDIDResolver
 from .....resolver.did_resolver import DIDResolver
 from .....storage.vc_holder.vc_record import VCRecord
 from .....tests import mock
-from .....utils.testing import create_test_profile
+from .....utils.testing import create_test_profile, skip_on_jsonld_url_error
 from .....vc.ld_proofs import BbsBlsSignature2020
 from .....vc.ld_proofs.constants import SECURITY_CONTEXT_BBS_URL
 from .....vc.ld_proofs.document_loader import DocumentLoader
@@ -24,7 +24,7 @@ from .....wallet.default_verification_key_strategy import (
 )
 from .....wallet.did_method import KEY, SOV, DIDMethods
 from .....wallet.error import WalletNotFoundError
-from .....wallet.key_type import BLS12381G2, ED25519, KeyTypes
+from .....wallet.key_type import BLS12381G2, ED25519, P256, KeyTypes
 from .. import pres_exch_handler as test_module
 from ..pres_exch import (
     Constraints,
@@ -82,6 +82,7 @@ class TestPresExchangeHandler(IsolatedAsyncioTestCase):
             creds, pds = get_test_data()
             return creds, pds
 
+    @skip_on_jsonld_url_error
     async def test_load_cred_json_a(self):
         cred_list, pd_list = await self.setup_tuple(self.profile)
         dif_pres_exch_handler = DIFPresExchHandler(self.profile)
@@ -103,6 +104,7 @@ class TestPresExchangeHandler(IsolatedAsyncioTestCase):
                 assert len(tmp_vp.get("verifiableCredential")) == tmp_pd[1]
 
     @pytest.mark.ursa_bbs_signatures
+    @skip_on_jsonld_url_error
     async def test_load_cred_json_b(self):
         cred_list, pd_list = await self.setup_tuple(self.profile)
         dif_pres_exch_handler = DIFPresExchHandler(
@@ -346,6 +348,7 @@ class TestPresExchangeHandler(IsolatedAsyncioTestCase):
             )
 
     @pytest.mark.ursa_bbs_signatures
+    @skip_on_jsonld_url_error
     async def test_subject_is_issuer_check(self):
         cred_list, _ = await self.setup_tuple(self.profile)
         dif_pres_exch_handler = DIFPresExchHandler(self.profile)
@@ -712,6 +715,7 @@ class TestPresExchangeHandler(IsolatedAsyncioTestCase):
         assert tmp_reveal_doc
 
     @pytest.mark.ursa_bbs_signatures
+    @skip_on_jsonld_url_error
     async def test_filter_number_type_check(self):
         await self.setup_tuple(self.profile)
         dif_pres_exch_handler = DIFPresExchHandler(self.profile)
@@ -1246,6 +1250,7 @@ class TestPresExchangeHandler(IsolatedAsyncioTestCase):
         assert len(tmp_vp.get("verifiableCredential")) == 3
 
     @pytest.mark.ursa_bbs_signatures
+    @skip_on_jsonld_url_error
     async def test_filter_string(self):
         cred_list, _ = await self.setup_tuple(self.profile)
         dif_pres_exch_handler = DIFPresExchHandler(self.profile)
@@ -1864,6 +1869,7 @@ class TestPresExchangeHandler(IsolatedAsyncioTestCase):
         )
         assert len(tmp_vp.get("verifiableCredential")) == 6
 
+    @skip_on_jsonld_url_error
     def test_create_vc_record_with_graph_struct(self):
         dif_pres_exch_handler = DIFPresExchHandler(self.profile)
         test_credential_dict_a = {
@@ -2069,6 +2075,70 @@ class TestPresExchangeHandler(IsolatedAsyncioTestCase):
                 ) = await dif_pres_exch_handler.get_sign_key_credential_subject_id(
                     VC_RECORDS
                 )
+
+    async def test_get_sign_key_credential_subject_id_secp256r1(self):
+        dif_pres_exch_handler = DIFPresExchHandler(
+            self.profile, proof_type="EcdsaSecp256r1Signature2019"
+        )
+
+        VC_RECORDS = [
+            VCRecord(
+                contexts=[
+                    "https://www.w3.org/2018/credentials/v1",
+                    "https://www.w3.org/2018/credentials/examples/v1",
+                ],
+                expanded_types=[
+                    "https://www.w3.org/2018/credentials#VerifiableCredential",
+                    "https://example.org/examples#UniversityDegreeCredential",
+                ],
+                issuer_id="https://example.edu/issuers/565049",
+                subject_ids=["did:key:z6Mkgg342Ycpuk263R9d8Aq6MUaxPn1DDeHyGo38EefXmgDL"],
+                proof_types=["EcdsaSecp256r1Signature2019"],
+                schema_ids=["https://example.org/examples/degree.json"],
+                cred_value={"...": "..."},
+                given_id="http://example.edu/credentials/3732",
+                cred_tags={"some": "tag"},
+            ),
+            VCRecord(
+                contexts=[
+                    "https://www.w3.org/2018/credentials/v1",
+                    "https://www.w3.org/2018/credentials/examples/v1",
+                ],
+                expanded_types=[
+                    "https://www.w3.org/2018/credentials#VerifiableCredential",
+                    "https://example.org/examples#UniversityDegreeCredential",
+                ],
+                issuer_id="https://example.edu/issuers/565049",
+                subject_ids=[
+                    "did:sov:LjgpST2rjsoxYegQDRm7EL",
+                    "did:key:z6Mkgg342Ycpuk263R9d8Aq6MUaxPn1DDeHyGo38EefXmgDL",
+                ],
+                proof_types=["EcdsaSecp256r1Signature2019"],
+                schema_ids=["https://example.org/examples/degree.json"],
+                cred_value={"...": "..."},
+                given_id="http://example.edu/credentials/3732",
+                cred_tags={"some": "tag"},
+            ),
+        ]
+        with mock.patch.object(
+            DIFPresExchHandler,
+            "_did_info_for_did",
+            mock.CoroutineMock(),
+        ) as mock_did_info:
+            did_info = DIDInfo(
+                did="did:key:z6Mkgg342Ycpuk263R9d8Aq6MUaxPn1DDeHyGo38EefXmgDL",
+                verkey="verkey",
+                metadata={},
+                method=KEY,
+                key_type=P256,
+            )
+            mock_did_info.return_value = did_info
+            (
+                issuer_id,
+                filtered_creds,
+            ) = await dif_pres_exch_handler.get_sign_key_credential_subject_id(VC_RECORDS)
+            assert issuer_id == "did:key:z6Mkgg342Ycpuk263R9d8Aq6MUaxPn1DDeHyGo38EefXmgDL"
+            assert len(filtered_creds) == 2
 
     async def test_get_sign_key_credential_subject_id_bbsbls(self):
         dif_pres_exch_handler = DIFPresExchHandler(
@@ -2575,6 +2645,7 @@ class TestPresExchangeHandler(IsolatedAsyncioTestCase):
         )
 
     @pytest.mark.ursa_bbs_signatures
+    @skip_on_jsonld_url_error
     async def test_derive_cred_missing_credsubjectid(self):
         dif_pres_exch_handler = DIFPresExchHandler(self.profile)
         test_pd = """

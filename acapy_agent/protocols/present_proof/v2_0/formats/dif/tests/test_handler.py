@@ -10,7 +10,7 @@ from .......resolver.did_resolver import DIDResolver
 from .......storage.vc_holder.base import VCHolder
 from .......storage.vc_holder.vc_record import VCRecord
 from .......tests import mock
-from .......utils.testing import create_test_profile
+from .......utils.testing import create_test_profile, skip_on_jsonld_url_error
 from .......vc.ld_proofs import DocumentLoader
 from .......vc.vc_di.manager import VcDiManager
 from .......vc.vc_ld.manager import VcLdpManager
@@ -1042,6 +1042,52 @@ class TestDIFFormatHandler(IsolatedAsyncioTestCase):
             )
             assert output[1].data.json_ == DIF_PRES
 
+    async def test_create_pres_pd_claim_format_secp256r1(self):
+        test_pd = deepcopy(DIF_PRES_REQUEST_B)
+        test_pd["presentation_definition"]["format"] = {
+            "ldp_vp": {"proof_type": ["EcdsaSecp256r1Signature2019"]}
+        }
+        del test_pd["presentation_definition"]["input_descriptors"][0]["constraints"][
+            "limit_disclosure"
+        ]
+        dif_pres_request = V20PresRequest(
+            formats=[
+                V20PresFormat(
+                    attach_id="dif",
+                    format_=ATTACHMENT_FORMAT[PRES_20_REQUEST][
+                        V20PresFormat.Format.DIF.api
+                    ],
+                )
+            ],
+            request_presentations_attach=[
+                AttachDecorator.data_json(test_pd, ident="dif")
+            ],
+        )
+        record = V20PresExRecord(
+            pres_ex_id="pxid",
+            thread_id="thid",
+            connection_id="conn_id",
+            initiator="init",
+            role="role",
+            state="state",
+            pres_request=dif_pres_request,
+            verified="false",
+            auto_present=True,
+            error_msg="error",
+        )
+
+        with mock.patch.object(
+            DIFPresExchHandler,
+            "create_vp",
+            mock.CoroutineMock(),
+        ) as mock_create_vp:
+            mock_create_vp.return_value = DIF_PRES
+            output = await self.handler.create_pres(record, {})
+            assert isinstance(output[0], V20PresFormat) and isinstance(
+                output[1], AttachDecorator
+            )
+            assert output[1].data.json_ == DIF_PRES
+
     async def test_create_pres_pd_claim_format_bls12381g2(self):
         test_pd = deepcopy(DIF_PRES_REQUEST_B)
         test_pd["presentation_definition"]["format"] = {
@@ -1979,6 +2025,7 @@ class TestDIFFormatHandler(IsolatedAsyncioTestCase):
             await self.handler.receive_pres(message=dif_pres, pres_ex_record=record)
             mock_log_err.assert_called_once()
 
+    @skip_on_jsonld_url_error
     async def test_verify_received_pres_no_match_b(self):
         dif_proof_req = deepcopy(DIF_PRES_REQUEST_B)
         dif_proof_req["presentation_definition"]["input_descriptors"][0]["constraints"][
@@ -2082,6 +2129,7 @@ class TestDIFFormatHandler(IsolatedAsyncioTestCase):
             await self.handler.receive_pres(message=dif_pres, pres_ex_record=record)
             mock_log_err.assert_called_once()
 
+    @skip_on_jsonld_url_error
     async def test_verify_received_pres_limit_disclosure_fail_b(self):
         dif_proof = deepcopy(DIF_PRES)
         dif_proof["verifiableCredential"][0]["credentialSubject"]["test"] = "Test"

@@ -30,7 +30,7 @@ from .store import AskarOpenStore, AskarStoreConfig
 LOGGER = logging.getLogger(__name__)
 
 
-class AskarAnoncredsProfile(Profile):
+class AskarAnonCredsProfile(Profile):
     """Provide access to Aries-Askar profile interaction methods."""
 
     BACKEND_NAME = "askar-anoncreds"
@@ -44,7 +44,9 @@ class AskarAnoncredsProfile(Profile):
         profile_id: Optional[str] = None,
     ):
         """Create a new AskarProfile instance."""
-        super().__init__(context=context, name=opened.name, created=opened.created)
+        super().__init__(
+            context=context, name=profile_id or opened.name, created=opened.created
+        )
         self.opened = opened
         self.ledger_pool: Optional[IndyVdrLedgerPool] = None
         self.profile_id = profile_id
@@ -54,7 +56,7 @@ class AskarAnoncredsProfile(Profile):
     @property
     def name(self) -> str:
         """Accessor for the profile name."""
-        return self.opened.name
+        return self.profile_id or self.opened.name
 
     @property
     def store(self) -> Store:
@@ -69,7 +71,7 @@ class AskarAnoncredsProfile(Profile):
     def init_ledger_pool(self):
         """Initialize the ledger pool."""
         if self.settings.get("ledger.disabled"):
-            LOGGER.info("Ledger support is disabled")
+            LOGGER.debug("init_ledger_pool: Ledger support is disabled")
             return
         if self.settings.get("ledger.genesis_transactions"):
             pool_name = self.settings.get("ledger.pool_name", "default")
@@ -115,33 +117,35 @@ class AskarAnoncredsProfile(Profile):
             IndyIssuer,
             ClassProvider("acapy_agent.indy.credx.issuer.IndyCredxIssuer", ref(self)),
         )
-        if (
-            self.settings.get("ledger.ledger_config_list")
-            and len(self.settings.get("ledger.ledger_config_list")) >= 1
-        ):
+
+        ledger_config_list = self.settings.get("ledger.ledger_config_list")
+        if ledger_config_list:
             write_ledger_config = get_write_ledger_config_for_profile(
                 settings=self.settings
             )
             cache = self.context.injector.inject_or(BaseCache)
+
+            pool_name = write_ledger_config.get("pool_name")
+            pool_id = write_ledger_config.get("id")
+            ledger_name = pool_name or pool_id
+            keepalive = write_ledger_config.get("keepalive")
+            read_only = write_ledger_config.get("read_only")
+            socks_proxy = write_ledger_config.get("socks_proxy")
+            genesis_transactions = write_ledger_config.get("genesis_transactions")
+
+            ledger_pool = IndyVdrLedgerPool(
+                name=ledger_name,
+                keepalive=keepalive,
+                cache=cache,
+                genesis_transactions=genesis_transactions,
+                read_only=read_only,
+                socks_proxy=socks_proxy,
+            )
             injector.bind_provider(
                 BaseLedger,
-                ClassProvider(
-                    IndyVdrLedger,
-                    IndyVdrLedgerPool(
-                        write_ledger_config.get("pool_name")
-                        or write_ledger_config.get("id"),
-                        keepalive=write_ledger_config.get("keepalive"),
-                        cache=cache,
-                        genesis_transactions=write_ledger_config.get(
-                            "genesis_transactions"
-                        ),
-                        read_only=write_ledger_config.get("read_only"),
-                        socks_proxy=write_ledger_config.get("socks_proxy"),
-                    ),
-                    ref(self),
-                ),
+                ClassProvider(IndyVdrLedger, ledger_pool, ref(self)),
             )
-            self.settings["ledger.write_ledger"] = write_ledger_config.get("id")
+            self.settings["ledger.write_ledger"] = pool_id
             if (
                 "endorser_alias" in write_ledger_config
                 and "endorser_did" in write_ledger_config
@@ -159,19 +163,19 @@ class AskarAnoncredsProfile(Profile):
 
     def session(
         self, context: Optional[InjectionContext] = None
-    ) -> "AskarAnoncredsProfileSession":
+    ) -> "AskarAnonCredsProfileSession":
         """Start a new interactive session with no transaction support requested."""
-        return AskarAnoncredsProfileSession(self, False, context=context)
+        return AskarAnonCredsProfileSession(self, False, context=context)
 
     def transaction(
         self, context: Optional[InjectionContext] = None
-    ) -> "AskarAnoncredsProfileSession":
+    ) -> "AskarAnonCredsProfileSession":
         """Start a new interactive session with commit and rollback support.
 
         If the current backend does not support transactions, then commit
         and rollback operations of the session will not have any effect.
         """
-        return AskarAnoncredsProfileSession(self, True, context=context)
+        return AskarAnonCredsProfileSession(self, True, context=context)
 
     async def close(self):
         """Close the profile instance."""
@@ -180,18 +184,18 @@ class AskarAnoncredsProfile(Profile):
             self.opened = None
 
 
-class AskarAnoncredsProfileSession(ProfileSession):
+class AskarAnonCredsProfileSession(ProfileSession):
     """An active connection to the profile management backend."""
 
     def __init__(
         self,
-        profile: AskarAnoncredsProfile,
+        profile: AskarAnonCredsProfile,
         is_txn: bool,
         *,
         context: Optional[InjectionContext] = None,
         settings: Mapping[str, Any] = None,
     ):
-        """Create a new AskarAnoncredsProfileSession instance."""
+        """Create a new AskarAnonCredsProfileSession instance."""
         super().__init__(profile=profile, context=context, settings=settings)
         if is_txn:
             self._opener = self.profile.store.transaction(profile.profile_id)
@@ -280,7 +284,7 @@ class AskarAnonProfileManager(ProfileManager):
         opened = await store_config.open_store(
             provision=True, in_memory=config.get("test")
         )
-        return AskarAnoncredsProfile(opened, context)
+        return AskarAnonCredsProfile(opened, context)
 
     async def open(
         self, context: InjectionContext, config: Mapping[str, Any] = None
@@ -290,7 +294,7 @@ class AskarAnonProfileManager(ProfileManager):
         opened = await store_config.open_store(
             provision=False, in_memory=config.get("test")
         )
-        return AskarAnoncredsProfile(opened, context)
+        return AskarAnonCredsProfile(opened, context)
 
     @classmethod
     async def generate_store_key(self, seed: Optional[str] = None) -> str:

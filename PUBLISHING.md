@@ -6,7 +6,7 @@ a major, minor or patch release, per [semver](https://semver.org/) rules.
 
 Once ready to do a release, create a local branch that includes the following updates:
 
-1. Create a local PR branch from an updated `main` branch, e.g. "1.1.1".
+1. Create a local PR branch from an updated `main` branch, e.g. "1.3.1".
 
 2. See if there are any Document Site `mkdocs` changes needed. Run the script
    `./scripts/prepmkdocs.sh; mkdocs`. Watch the log, noting particularly if
@@ -65,8 +65,9 @@ The output should look like this -- and what you see in [CHANGELOG.md](CHANGELOG
 
 Once you have the list of PRs:
 
-- Organize the list into suitable categories in the [CHANGELOG.md](CHANGELOG.md) file, update (if necessary) the PR title and add notes to clarify the changes. See previous release entries to understand the style -- a format that should help developers.
-- Add a narrative about the release above the PR that highlights what has gone into the release.
+- ChatGPT or equivalent can be used to process the list of PRs and:
+   - Organize the list into suitable categories in the [CHANGELOG.md](CHANGELOG.md) file, update (if necessary) the PR title and add notes to clarify the changes. See previous release entries to understand the style -- a format that should help developers.
+   - Add a narrative about the release above the PR that highlights what has gone into the release.
 - To cover the `dependabot` PRs without listing them all, add to the end of the
   categorized list of PRs the two `dependabot` lines of the script output (after the list of PRs). The text will look like this:
 
@@ -115,32 +116,31 @@ Once you have the list of PRs:
    wait until it is merged. It's embarrassing when you have to do a whole new
    release just because you missed something silly...I know!
 
-6.    Immediately after it is merged, create a new GitHub tag representing the
+6.     Immediately after it is merged, create a new GitHub tag representing the
    version. The tag name and title of the release should be the same as the
    version in [pyproject.toml](https://github.com/openwallet-foundation/acapy/tree/main/pyproject.toml). Use
    the "Generate Release Notes" capability to get a sequential listing of the
    PRs in the release, to complement the manually curated Changelog. Verify on
    PyPi that the version is published.
 
-7.     New images for the release are automatically published by the GitHubAction
-   Workflows: [publish.yml] and [publish-indy.yml]. The actions are triggered
-   when a release is tagged, so no manual action is needed. The images are
-   published in the [OpenWallet Foundation Package Repository under
-   acapy](https://github.com/openwallet-foundation/packages?repo_name=acapy)
-   and a link to the packages added to the repositories main page (under
-   "Packages").
+7.      New images for the release are automatically published by the GitHubAction
+   Workflow: [publish.yml]. The action is triggered when a release is tagged, so
+   no manual action is needed. Images are published in the [OpenWallet
+   Foundation Package Repository under
+   acapy-agent](https://github.com/openwallet-foundation/acapy/pkgs/container/acapy-agent/versions?filters%5Bversion_type%5D=tagged).
 
    Additional information about the container image publication process can be
    found in the document [Container Images and Github Actions](docs/deploying/ContainerImagesAndGithubActions.md).
 
-   In addition, the published documentation site [https://aca-py.org] should be automatically updated to include the new release via the [publish-docs] GitHub Action.
-   Additional information about that process and some related maintenance activities that are needed from time to time can be found in the [Updating the ACA-Py Documentation Site] document.
+   In addition, the published documentation site [https://aca-py.org] must be
+   updated to include the new release via the [publish-docs] GitHub Action.
+   Additional information about that process and some related maintenance
+   activities that are needed from time to time can be found in the [Managing the ACA-Py Documentation Site] document.
 
 [publish.yml]: https://github.com/openwallet-foundation/acapy/blob/main/.github/workflows/publish.yml
-[publish-indy.yml]: https://github.com/openwallet-foundation/acapy/blob/main/.github/workflows/publish-indy.yml
 
-1.   When a new release is tagged, create a new branch at the same commit with
-    the branch name in the format `docs-v<version>`, for example, `docs-v1.1.1`.
+1.    When a new release is tagged, create a new branch at the same commit with
+    the branch name in the format `docs-v<version>`, for example, `docs-v1.3.1`.
     The creation of the branch triggers the execution of the [publish-docs]
     GitHub Action which generates the documentation for the new release,
     publishing it at [https://aca-py.org]. The GitHub Action also executes when

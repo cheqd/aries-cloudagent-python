@@ -42,7 +42,9 @@ class AskarProfile(Profile):
         profile_id: Optional[str] = None,
     ):
         """Create a new AskarProfile instance."""
-        super().__init__(context=context, name=opened.name, created=opened.created)
+        super().__init__(
+            context=context, name=profile_id or opened.name, created=opened.created
+        )
         self.opened = opened
         self.ledger_pool: Optional[IndyVdrLedgerPool] = None
         self.profile_id = profile_id
@@ -52,7 +54,7 @@ class AskarProfile(Profile):
     @property
     def name(self) -> str:
         """Accessor for the profile name."""
-        return self.opened.name
+        return self.profile_id or self.opened.name
 
     @property
     def store(self) -> Store:
@@ -67,7 +69,7 @@ class AskarProfile(Profile):
     def init_ledger_pool(self):
         """Initialize the ledger pool."""
         if self.settings.get("ledger.disabled"):
-            LOGGER.info("Ledger support is disabled")
+            LOGGER.debug("init_ledger_pool: Ledger support is disabled")
             return
         if self.settings.get("ledger.genesis_transactions"):
             pool_name = self.settings.get("ledger.pool_name", "default")
@@ -126,33 +128,37 @@ class AskarProfile(Profile):
                 ClassProvider.Inject(Profile),
             ),
         )
-        if (
-            self.settings.get("ledger.ledger_config_list")
-            and len(self.settings.get("ledger.ledger_config_list")) >= 1
-        ):
+
+        ledger_config_list = self.settings.get("ledger.ledger_config_list")
+        if ledger_config_list:
             write_ledger_config = get_write_ledger_config_for_profile(
                 settings=self.settings
             )
             cache = self.context.injector.inject_or(BaseCache)
+
+            pool_name = write_ledger_config.get("pool_name")
+            pool_id = write_ledger_config.get("id")
+            ledger_name = pool_name or pool_id
+            keepalive = write_ledger_config.get("keepalive")
+            read_only = write_ledger_config.get("read_only")
+            socks_proxy = write_ledger_config.get("socks_proxy")
+            genesis_transactions = write_ledger_config.get("genesis_transactions")
+
+            ledger_pool = IndyVdrLedgerPool(
+                name=ledger_name,
+                keepalive=keepalive,
+                cache=cache,
+                genesis_transactions=genesis_transactions,
+                read_only=read_only,
+                socks_proxy=socks_proxy,
+            )
+
             injector.bind_provider(
                 BaseLedger,
-                ClassProvider(
-                    IndyVdrLedger,
-                    IndyVdrLedgerPool(
-                        write_ledger_config.get("pool_name")
-                        or write_ledger_config.get("id"),
-                        keepalive=write_ledger_config.get("keepalive"),
-                        cache=cache,
-                        genesis_transactions=write_ledger_config.get(
-                            "genesis_transactions"
-                        ),
-                        read_only=write_ledger_config.get("read_only"),
-                        socks_proxy=write_ledger_config.get("socks_proxy"),
-                    ),
-                    ref(self),
-                ),
+                ClassProvider(IndyVdrLedger, ledger_pool, ref(self)),
             )
-            self.settings["ledger.write_ledger"] = write_ledger_config.get("id")
+            self.settings["ledger.write_ledger"] = pool_id
+
             if (
                 "endorser_alias" in write_ledger_config
                 and "endorser_did" in write_ledger_config
@@ -167,6 +173,7 @@ class AskarProfile(Profile):
             injector.bind_provider(
                 BaseLedger, ClassProvider(IndyVdrLedger, self.ledger_pool, ref(self))
             )
+
         if self.ledger_pool or self.settings.get("ledger.ledger_config_list"):
             injector.bind_provider(
                 IndyVerifier,
@@ -176,11 +183,15 @@ class AskarProfile(Profile):
                 ),
             )
 
-    def session(self, context: Optional[InjectionContext] = None) -> ProfileSession:
+    def session(
+        self, context: Optional[InjectionContext] = None
+    ) -> "AskarProfileSession":
         """Start a new interactive session with no transaction support requested."""
         return AskarProfileSession(self, False, context=context)
 
-    def transaction(self, context: Optional[InjectionContext] = None) -> ProfileSession:
+    def transaction(
+        self, context: Optional[InjectionContext] = None
+    ) -> "AskarProfileSession":
         """Start a new interactive session with commit and rollback support.
 
         If the current backend does not support transactions, then commit

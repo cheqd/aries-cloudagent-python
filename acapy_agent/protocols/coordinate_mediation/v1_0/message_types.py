@@ -3,7 +3,7 @@
 from ...didcomm_prefix import DIDCommPrefix
 
 SPEC_URI = (
-    "https://github.com/hyperledger/aries-rfcs/tree/"
+    "https://github.com/decentralized-identity/aries-rfcs/tree/"
     "fa8dc4ea1e667eb07db8f9ffeaf074a4455697c0/features/0211-route-coordination"
 )
 
@@ -29,8 +29,7 @@ MESSAGE_TYPES = DIDCommPrefix.qualify_all(
         KEYLIST_QUERY: f"{PROTOCOL_PACKAGE}.messages.keylist_query.KeylistQuery",
         KEYLIST_UPDATE: f"{PROTOCOL_PACKAGE}.messages.keylist_update.KeylistUpdate",
         KEYLIST_UPDATE_RESPONSE: (
-            f"{PROTOCOL_PACKAGE}."
-            "messages.keylist_update_response.KeylistUpdateResponse"
+            f"{PROTOCOL_PACKAGE}.messages.keylist_update_response.KeylistUpdateResponse"
         ),
         MEDIATE_DENY: f"{PROTOCOL_PACKAGE}.messages.mediate_deny.MediationDeny",
         MEDIATE_GRANT: f"{PROTOCOL_PACKAGE}.messages.mediate_grant.MediationGrant",

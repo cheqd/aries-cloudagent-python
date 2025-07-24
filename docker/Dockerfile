@@ -1,23 +1,27 @@
 ARG python_version=3.12
-FROM python:${python_version}-slim-bullseye AS build
+FROM python:${python_version}-slim-bookworm AS build
+
+RUN pip install --no-cache-dir poetry==2.1.1
 
 WORKDIR /src
 
-COPY . .
+COPY ./pyproject.toml ./poetry.lock ./
+RUN poetry install --no-root
 
-RUN pip install --no-cache-dir poetry
+COPY ./acapy_agent ./acapy_agent
+COPY ./README.md /src
 RUN poetry build
 
-FROM python:${python_version}-slim-bullseye AS main
+FROM python:${python_version}-slim-bookworm AS main
 
 ARG uid=1001
 ARG user=aries
-ARG acapy_name="aries-cloudagent"
+ARG acapy_name="acapy-agent"
 ARG acapy_version
 ARG acapy_reqs=[didcommv2]
 
 ENV HOME="/home/$user" \
-    APP_ROOT="$HOME" \
+    APP_ROOT="/home/$user" \
     LC_ALL=C.UTF-8 \
     LANG=C.UTF-8 \
     PIP_NO_CACHE_DIR=off \
@@ -26,7 +30,7 @@ ENV HOME="/home/$user" \
     RUST_LOG=warn \
     SHELL=/bin/bash \
     SUMMARY="$acapy_name image" \
-    DESCRIPTION="$acapy_name provides a base image for running Hyperledger Aries agents in Docker. \
+    DESCRIPTION="$acapy_name provides a base image for running acapy agents in Docker. \
     This image layers the python implementation of $acapy_name $acapy_version. Based on Debian Buster."
 
 LABEL summary="$SUMMARY" \
@@ -41,26 +45,21 @@ LABEL summary="$SUMMARY" \
 RUN useradd -U -ms /bin/bash -u $uid $user
 
 # Install environment
-RUN apt-get update -y && \
+RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     apt-transport-https \
     ca-certificates \
-    build-essential \
-    bzip2 \
     curl \
     git \
-    less \
     libffi-dev \
     libgmp10 \
-    liblzma5 \
     libncurses5 \
     libncursesw5 \
-    libsecp256k1-0 \
-    libzmq5 \
-    net-tools \
     openssl \
     sqlite3 \
     zlib1g && \
+    apt-get autopurge -y && \
+    apt-get clean -y && \
     rm -rf /var/lib/apt/lists/* /usr/share/doc/*
 
 WORKDIR $HOME
@@ -99,11 +98,5 @@ RUN acapy_agent_package=$(find ./ -name "acapy_agent*.whl" | head -n 1) && \
     pip install --no-cache-dir --find-links=. ${acapy_agent_package}${acapy_reqs} && \
     rm acapy_agent*.whl && \
     chmod +rx $(python -m site --user-site) $HOME/.local
-
-# Clean-up unneccessary build dependencies and reduce final image size
-USER root
-RUN apt-get purge -y --auto-remove build-essential
-
-USER $user
 
 ENTRYPOINT ["aca-py"]

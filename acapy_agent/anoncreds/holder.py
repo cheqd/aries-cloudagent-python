@@ -1,4 +1,4 @@
-"""Indy holder implementation."""
+"""AnonCreds holder implementation."""
 
 import asyncio
 import json
@@ -22,7 +22,7 @@ from pyld import jsonld
 from pyld.jsonld import JsonLdProcessor
 from uuid_utils import uuid4
 
-from ..askar.profile_anon import AskarAnoncredsProfile
+from ..askar.profile_anon import AskarAnonCredsProfile
 from ..core.error import BaseError
 from ..core.profile import Profile
 from ..storage.vc_holder.base import VCHolder
@@ -41,7 +41,7 @@ CATEGORY_CREDENTIAL = "credential"
 CATEGORY_MASTER_SECRET = "master_secret"
 
 
-def _make_cred_info(cred_id, cred: Credential):
+def _make_cred_info(cred_id: str, cred: Credential) -> dict:
     cred_info = cred.to_dict()  # not secure!
     rev_info = cred_info["signature"]["r_credential"]
     return {
@@ -78,9 +78,9 @@ class AnonCredsHolder:
         self._profile = profile
 
     @property
-    def profile(self) -> AskarAnoncredsProfile:
+    def profile(self) -> AskarAnonCredsProfile:
         """Accessor for the profile instance."""
-        if not isinstance(self._profile, AskarAnoncredsProfile):
+        if not isinstance(self._profile, AskarAnonCredsProfile):
             raise ValueError(ANONCREDS_PROFILE_REQUIRED_MSG)
 
         return self._profile
@@ -372,12 +372,12 @@ class AnonCredsHolder:
 
         return credential_id
 
-    async def get_credentials(self, start: int, count: int, wql: dict):
+    async def get_credentials(self, *, offset: int, limit: int, wql: dict) -> list[dict]:
         """Get credentials stored in the wallet.
 
         Args:
-            start: Starting index
-            count: Number of records to return
+            offset: Starting index
+            limit: Number of records to return
             wql: wql query dict
 
         """
@@ -388,8 +388,8 @@ class AnonCredsHolder:
             rows = self.profile.store.scan(
                 category=CATEGORY_CREDENTIAL,
                 tag_filter=wql,
-                offset=start,
-                limit=count,
+                offset=offset,
+                limit=limit,
                 profile=self.profile.settings.get("wallet.askar_profile"),
             )
             async for row in rows:
@@ -406,17 +406,18 @@ class AnonCredsHolder:
         self,
         presentation_request: dict,
         referents: Sequence[str],
-        start: int,
-        count: int,
+        *,
+        offset: int,
+        limit: int,
         extra_query: Optional[dict] = None,
-    ):
+    ) -> list:
         """Get credentials stored in the wallet.
 
         Args:
             presentation_request: Valid presentation request from issuer
             referents: Presentation request referents to use to search for creds
-            start: Starting index
-            count: Maximum number of records to return
+            offset: Starting index
+            limit: Maximum number of records to return
             extra_query: wql query dict
 
         """
@@ -459,8 +460,8 @@ class AnonCredsHolder:
             rows = self.profile.store.scan(
                 category=CATEGORY_CREDENTIAL,
                 tag_filter=tag_filter,
-                offset=start,
-                limit=count,
+                offset=offset,
+                limit=limit,
                 profile=self.profile.settings.get("wallet.askar_profile"),
             )
             async for row in rows:
@@ -542,7 +543,7 @@ class AnonCredsHolder:
 
         return cred.rev_reg_index in set_revoked
 
-    async def delete_credential(self, credential_id: str):
+    async def delete_credential(self, credential_id: str) -> None:
         """Remove a credential stored in the wallet.
 
         Args:
@@ -597,10 +598,10 @@ class AnonCredsHolder:
 
         Args:
             presentation_request: Valid indy format presentation request
-            requested_credentials: Indy format requested credentials
-            schemas: Indy formatted schemas JSON
-            credential_definitions: Indy formatted credential definitions JSON
-            rev_states: Indy format revocation states JSON
+            requested_credentials: AnonCreds format requested credentials
+            schemas: AnonCreds formatted schemas JSON
+            credential_definitions: AnonCreds formatted credential definitions JSON
+            rev_states: AnonCreds format revocation states JSON
 
         """
 
@@ -690,9 +691,9 @@ class AnonCredsHolder:
             presentation_request: Valid indy format presentation request
             requested_credentials_w3c: W3C format requested credentials
             credentials_w3c_metadata: W3C format credential metadata
-            schemas: Indy formatted schemas JSON
-            credential_definitions: Indy formatted credential definitions JSON
-            rev_states: Indy format revocation states JSON
+            schemas: AnonCreds formatted schemas JSON
+            credential_definitions: AnonCreds formatted credential definitions JSON
+            rev_states: AnonCreds format revocation states JSON
 
         """
         present_creds = PresentCredentials()

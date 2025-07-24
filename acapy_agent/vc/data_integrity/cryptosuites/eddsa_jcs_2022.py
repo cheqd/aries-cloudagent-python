@@ -1,22 +1,23 @@
 """EddsaJcs2022 cryptosuite."""
 
+from datetime import datetime
 from hashlib import sha256
+
 import canonicaljson
 
+from ....core.error import BaseError
+from ....core.profile import ProfileSession
+from ....utils.multiformats import multibase
 from ....wallet.base import BaseWallet
 from ....wallet.keys.manager import (
     MultikeyManager,
-    multikey_to_verkey,
     key_type_from_multikey,
+    multikey_to_verkey,
 )
-from ....utils.multiformats import multibase
-from ....core.profile import ProfileSession
-from ....core.error import BaseError
+from ..errors import PROBLEM_DETAILS
 from ..models.options import DataIntegrityProofOptions
 from ..models.proof import DataIntegrityProof
-from ..models.verification_response import ProblemDetails, DataIntegrityVerificationResult
-from ..errors import PROBLEM_DETAILS
-from datetime import datetime
+from ..models.verification_response import DataIntegrityVerificationResult, ProblemDetails
 
 
 class CryptosuiteError(BaseError):
@@ -71,12 +72,12 @@ class EddsaJcs2022:
         https://www.w3.org/TR/vc-di-eddsa/#proof-configuration-eddsa-jcs-2022.
         """
         proof_config = options
-        assert (
-            proof_config.type == "DataIntegrityProof"
-        ), 'Expected proof.type to be "DataIntegrityProof'
-        assert (
-            proof_config.cryptosuite == "eddsa-jcs-2022"
-        ), 'Expected proof.cryptosuite to be "eddsa-jcs-2022'
+        assert proof_config.type == "DataIntegrityProof", (
+            'Expected proof.type to be "DataIntegrityProof'
+        )
+        assert proof_config.cryptosuite == "eddsa-jcs-2022", (
+            'Expected proof.cryptosuite to be "eddsa-jcs-2022'
+        )
 
         if proof_config.created:
             assert datetime.fromisoformat(proof_config.created)
@@ -93,12 +94,12 @@ class EddsaJcs2022:
 
         https://www.w3.org/TR/vc-di-eddsa/#transformation-eddsa-jcs-2022.
         """
-        assert (
-            options.type == "DataIntegrityProof"
-        ), "Expected proof.type to be `DataIntegrityProof`"
-        assert (
-            options.cryptosuite == "eddsa-jcs-2022"
-        ), "Expected proof.cryptosuite to be `eddsa-jcs-2022`"
+        assert options.type == "DataIntegrityProof", (
+            "Expected proof.type to be `DataIntegrityProof`"
+        )
+        assert options.cryptosuite == "eddsa-jcs-2022", (
+            "Expected proof.cryptosuite to be `eddsa-jcs-2022`"
+        )
 
         return self._canonicalize(unsecured_document)
 
@@ -193,7 +194,7 @@ class EddsaJcs2022:
         """
         multikey = await MultikeyManager(
             self.session
-        ).resolve_multikey_from_verification_method(options.verification_method)
+        ).resolve_multikey_from_verification_method_id(options.verification_method)
         verkey = multikey_to_verkey(multikey)
         key_type = key_type_from_multikey(multikey)
         return await self.wallet.verify_message(

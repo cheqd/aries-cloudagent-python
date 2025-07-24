@@ -43,75 +43,12 @@ from .. import handler as test_module
 from ..handler import LOGGER as LD_PROOF_LOGGER
 from ..handler import LDProofCredFormatHandler
 from ..models.cred_detail import LDProofVCDetail
-
-TEST_DID_SOV = "did:sov:LjgpST2rjsoxYegQDRm7EL"
-TEST_DID_KEY = "did:key:z6Mkgg342Ycpuk263R9d8Aq6MUaxPn1DDeHyGo38EefXmgDL"
-
-LD_PROOF_VC_DETAIL = {
-    "credential": {
-        "@context": [
-            "https://www.w3.org/2018/credentials/v1",
-            "https://www.w3.org/2018/credentials/examples/v1",
-        ],
-        "type": ["VerifiableCredential", "UniversityDegreeCredential"],
-        "credentialSubject": {"test": "key"},
-        "issuanceDate": "2021-04-12",
-        "issuer": TEST_DID_KEY,
-    },
-    "options": {
-        "proofType": "Ed25519Signature2018",
-        "created": "2019-12-11T03:50:55",
-    },
-}
-LD_PROOF_VC_DETAIL_BBS = {
-    "credential": {
-        "@context": [
-            "https://www.w3.org/2018/credentials/v1",
-            "https://www.w3.org/2018/credentials/examples/v1",
-        ],
-        "type": ["VerifiableCredential", "UniversityDegreeCredential"],
-        "credentialSubject": {"test": "key"},
-        "issuanceDate": "2021-04-12",
-        "issuer": TEST_DID_KEY,
-    },
-    "options": {
-        "proofType": "BbsBlsSignature2020",
-        "created": "2019-12-11T03:50:55",
-    },
-}
-LD_PROOF_VC_DETAIL_ED25519_2020 = {
-    "credential": {
-        "@context": [
-            "https://www.w3.org/2018/credentials/v1",
-            "https://www.w3.org/2018/credentials/examples/v1",
-        ],
-        "type": ["VerifiableCredential", "UniversityDegreeCredential"],
-        "credentialSubject": {"test": "key"},
-        "issuanceDate": "2021-04-12",
-        "issuer": TEST_DID_KEY,
-    },
-    "options": {
-        "proofType": "Ed25519Signature2020",
-        "created": "2019-12-11T03:50:55",
-    },
-}
-LD_PROOF_VC = {
-    "@context": [
-        "https://www.w3.org/2018/credentials/v1",
-        "https://www.w3.org/2018/credentials/examples/v1",
-    ],
-    "type": ["VerifiableCredential", "UniversityDegreeCredential"],
-    "credentialSubject": {"test": "key"},
-    "issuanceDate": "2021-04-12",
-    "issuer": TEST_DID_KEY,
-    "proof": {
-        "proofPurpose": "assertionMethod",
-        "created": "2019-12-11T03:50:55",
-        "type": "Ed25519Signature2018",
-        "verificationMethod": "did:key:z6Mkgg342Ycpuk263R9d8Aq6MUaxPn1DDeHyGo38EefXmgDL#z6Mkgg342Ycpuk263R9d8Aq6MUaxPn1DDeHyGo38EefXmgDL",
-        "jws": "eyJhbGciOiAiRWREU0EiLCAiYjY0IjogZmFsc2UsICJjcml0IjogWyJiNjQiXX0..Q6amIrxGiSbM7Ce6DxlfwLCjVcYyclas8fMxaecspXFUcFW9DAAxKzgHx93FWktnlZjM_biitkMgZdStgvivAQ",
-    },
-}
+from .fixtures import (
+    LD_PROOF_VC,
+    LD_PROOF_VC_DETAIL,
+    LD_PROOF_VC_DETAIL_BBS,
+    LD_PROOF_VC_DETAIL_ED25519_2020,
+)
 
 
 class TestV20LDProofCredFormatHandler(IsolatedAsyncioTestCase):
@@ -166,7 +103,7 @@ class TestV20LDProofCredFormatHandler(IsolatedAsyncioTestCase):
 
         incorrect_detail = {
             **LD_PROOF_VC_DETAIL,
-            "credential": {**LD_PROOF_VC_DETAIL["credential"], "issuanceDate": None},
+            "credential": {**LD_PROOF_VC_DETAIL["credential"], "credentialSubject": None},
         }
 
         # test incorrect proposal
@@ -184,8 +121,7 @@ class TestV20LDProofCredFormatHandler(IsolatedAsyncioTestCase):
         # test incorrect cred
         with self.assertRaises(ValidationError):
             incorrect_cred = LD_PROOF_VC.copy()
-            incorrect_cred.pop("issuanceDate")
-
+            incorrect_cred.pop("credentialSubject")
             self.handler.validate_fields(CRED_20_ISSUE, incorrect_cred)
 
     async def test_get_ld_proof_detail_record(self):
@@ -256,20 +192,10 @@ class TestV20LDProofCredFormatHandler(IsolatedAsyncioTestCase):
 
     async def test_create_offer(self):
         with (
-            mock.patch.object(
-                VcLdpManager,
-                "assert_can_issue_with_id_and_proof_type",
-                mock.CoroutineMock(),
-            ) as mock_can_issue,
             patch.object(test_module, "get_properties_without_context", return_value=[]),
         ):
             (cred_format, attachment) = await self.handler.create_offer(
                 self.cred_proposal
-            )
-
-            mock_can_issue.assert_called_once_with(
-                LD_PROOF_VC_DETAIL["credential"]["issuer"],
-                LD_PROOF_VC_DETAIL["options"]["proofType"],
             )
 
         # assert identifier match
@@ -297,11 +223,6 @@ class TestV20LDProofCredFormatHandler(IsolatedAsyncioTestCase):
         )
 
         with (
-            mock.patch.object(
-                VcLdpManager,
-                "assert_can_issue_with_id_and_proof_type",
-                mock.CoroutineMock(),
-            ),
             patch.object(test_module, "get_properties_without_context", return_value=[]),
         ):
             (cred_format, attachment) = await self.handler.create_offer(cred_proposal)
@@ -325,11 +246,6 @@ class TestV20LDProofCredFormatHandler(IsolatedAsyncioTestCase):
         )
 
         with (
-            mock.patch.object(
-                VcLdpManager,
-                "assert_can_issue_with_id_and_proof_type",
-                mock.CoroutineMock(),
-            ),
             patch.object(test_module, "get_properties_without_context", return_value=[]),
         ):
             (cred_format, attachment) = await self.handler.create_offer(cred_proposal)
@@ -350,11 +266,6 @@ class TestV20LDProofCredFormatHandler(IsolatedAsyncioTestCase):
     async def test_create_offer_x_wrong_attributes(self):
         missing_properties = ["foo"]
         with (
-            mock.patch.object(
-                self.manager,
-                "assert_can_issue_with_id_and_proof_type",
-                mock.CoroutineMock(),
-            ),
             patch.object(
                 test_module,
                 "get_properties_without_context",

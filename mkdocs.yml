@@ -93,13 +93,14 @@ nav:
     - Qualified DIDs: features/QualifiedDIDs.md
     - DID Methods: features/DIDMethods.md
     - DID Resolution: features/DIDResolution.md
+    - Reusing DIDComm Connections Between Agents: features/ReuseConnection.md
     - Publishing AnonCreds Objects To Other Ledgers/Verifiable Data Registries: features/AnonCredsMethods.md
     - Configuring Multiple Indy Ledgers: features/Multiledger.md
     - Automatically Endorsing Indy Transations: features/Endorser.md
     - Using W3C JSON-LD Signed Credentials: features/JsonLdCredentials.md
     - Issuing and Presenting W3C Data Integrity VCs: features/W3cCredentials.md
     - Using SD-JWTs: features/SelectiveDisclosureJWTs.md
-    - AnonCreds Presentation Validation: features/AnoncredsProofValidation.md
+    - AnonCreds Presentation Validation: features/AnonCredsProofValidation.md
     - Multiple Credential Types: features/Multicredentials.md
     - Code Generation with the Open API: features/UsingOpenAPI.md
     - ACA-Py as a DIDComm Mediator: features/Mediation.md
@@ -137,7 +138,7 @@ nav:
     - Upgrading ACA-Py: deploying/UpgradingACA-Py.md
     - Enabling BBS Signatures support: deploying/BBSSignatures.md
     - Indy SDK to Askar Migration: deploying/IndySDKtoAskarMigration.md
-    - Controller Migration to use AnonCreds Rust: deploying/AnoncredsControllerMigration.md
+    - Controller Migration to use the askar-anoncreds Wallet Type: deploying/AnonCredsControllerMigration.md
     - The Use of Poetry in ACA-Py: deploying/Poetry.md
     - ACA-Py Container Images: deploying/ContainerImagesAndGithubActions.md
     - Databases: deploying/Databases.md
